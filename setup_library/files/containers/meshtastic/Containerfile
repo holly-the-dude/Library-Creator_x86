@@ -1,0 +1,55 @@
+# Meshtastic USB radio + official web client for Raspberry Pi / Debian 13.
+# The USB radio runs Meshtastic firmware; the Pi bridges its serial client API.
+ARG BASE_IMAGE=localhost/rasbase_master:latest
+FROM ${BASE_IMAGE}
+
+LABEL description="Library Meshtastic web client and USB serial bridge"
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        bash ca-certificates curl gzip nginx python3 python3-venv && \
+    rm -rf /var/lib/apt/lists/*
+
+# A venv respects Trixie's externally managed system Python installation.
+# Firmware installation is handled exclusively by the meshflash container.
+ARG MESHTASTIC_VERSION=2.7.11
+RUN python3 -m venv /opt/meshtastic-venv && \
+    /opt/meshtastic-venv/bin/pip install --no-cache-dir \
+        "meshtastic[cli]==${MESHTASTIC_VERSION}"
+ENV PATH="/opt/meshtastic-venv/bin:${PATH}" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    SERIAL_DEVICE=/dev/meshtastic \
+    DATA_DIR=/var/lib/meshtastic \
+    DISCOVERY_SECONDS=60 \
+    LORA_REGION=US \
+    ENSURE_SERIAL_ENABLED=1
+
+# The release title is 2.7.5, but its actual upstream tag is v2.7.2.
+# Static assets are architecture-independent and downloaded only at build time.
+ARG WEB_VERSION=2.7.2
+ARG WEB_SHA256=62657b85b4c24af4d44da2932b64143abdbf6e65a79fcb51fd0801d9540616e2
+RUN curl -fsSL --retry 3 \
+        "https://github.com/meshtastic/web/releases/download/v${WEB_VERSION}/build.tar" \
+        -o /tmp/meshtastic-web.tar && \
+    echo "${WEB_SHA256}  /tmp/meshtastic-web.tar" | sha256sum -c - && \
+    mkdir -p /var/www/meshtastic && \
+    tar -xf /tmp/meshtastic-web.tar -C /var/www/meshtastic && \
+    find /var/www/meshtastic -type f -name '*.gz' -exec gunzip '{}' + && \
+    test -s /var/www/meshtastic/index.html && \
+    chmod -R a+rX /var/www/meshtastic && \
+    rm /tmp/meshtastic-web.tar
+
+COPY bootstrap.py bridge.py discover.py /opt/meshtastic/
+COPY nginx.conf /etc/nginx/nginx.conf
+COPY entrypoint.sh /usr/local/bin/start-meshtastic
+RUN chmod +x /usr/local/bin/start-meshtastic && \
+    mkdir -p /var/lib/meshtastic && \
+    chmod 700 /var/lib/meshtastic && \
+    nginx -t
+
+VOLUME ["/var/lib/meshtastic"]
+EXPOSE 8086
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:8086/health >/dev/null || exit 1
+ENTRYPOINT ["/usr/local/bin/start-meshtastic"]

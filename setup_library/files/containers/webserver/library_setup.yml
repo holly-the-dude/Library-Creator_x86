@@ -1,0 +1,174 @@
+# =============================================================================
+# Library System Configuration
+# =============================================================================
+# This file configures the library webserver and all related containers.
+# It is read by library.py to dynamically build the web interface.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Webserver Configuration
+# Settings specific to the webserver container and nginx
+# -----------------------------------------------------------------------------
+webserver:
+  library_path: /library/library
+  web_path: /library/web
+  nginx:
+    listen_port: 80
+    server_names:
+      - localhost
+      - library
+      - library.local
+      - 10.1.1.1
+  shutdown_port: 9999
+
+# -----------------------------------------------------------------------------
+# Services
+# These are checked by the webserver and displayed in the navigation bar
+# if they respond correctly.
+# external_port keeps the browser hostname and changes only the service port.
+# external_url can instead specify a relative path (e.g. /music) or an external site.
+# -----------------------------------------------------------------------------
+services:
+  - name: wiki
+    display_name: Wiki
+    internal_ip: 10.88.0.200
+    internal_port: 6902
+    external_port: 6902
+    check_text: Kiwix
+    timeout: 5
+
+  - name: music
+    display_name: Music library (LMS)
+    internal_ip: 10.88.0.210
+    internal_port: 5082
+    external_url: /music
+    check_path: /music
+    check_text: ""
+    timeout: 110
+
+  - name: music_player
+    display_name: iPod-style player
+    internal_ip: 10.88.0.217
+    internal_port: 8080
+    external_port: 2001
+    check_text: '<title>Library Music</title>'
+    timeout: 5
+
+  - name: ebook
+    display_name: eBook Reader
+    internal_ip: 10.88.0.211
+    internal_port: 8083
+    external_port: 8083
+    check_text: Calibre-Web
+    timeout: 10
+
+  - name: craft_apps
+    display_name: Office
+    internal_ip: 10.88.0.218
+    # Probe the internal viewer; browsers connect only through HTTPS.
+    internal_port: 3000
+    external_port: 3001
+    external_scheme: https
+    check_text: "Selkies"
+    timeout: 5
+
+  - name: maps
+    display_name: OpenStreetMap
+    internal_ip: 10.88.0.212
+    internal_port: 8080
+    external_port: 8080
+    check_text: Library Maps
+    timeout: 5
+
+  - name: street_zim
+    display_name: StreetZim
+    internal_ip: 10.88.0.216
+    internal_port: 8093
+    external_port: 8093
+    check_path: /health
+    check_text: '"ready": true'
+    timeout: 5
+
+  - name: meshtastic
+    display_name: Meshtastic
+    # Probe the Pi's published port: both the bridge and firmware setup
+    # terminal use port 8086 and are mutually exclusive.
+    internal_ip: 10.1.1.1
+    internal_port: 8086
+    external_port: 8086
+    check_path: /
+    check_text: '<html'
+    timeout: 5
+
+  - name: data_download
+    display_name: Downloads
+    internal_ip: 10.1.1.1
+    internal_port: 4826
+    external_port: 4826
+    # Local health stays available while the downloader waits for internet.
+    check_path: /api/health
+    check_text: '"status": "ok"'
+    timeout: 5
+
+# -----------------------------------------------------------------------------
+# Container Definitions
+# Used by the bootstrap/setup scripts to create and manage containers.
+# -----------------------------------------------------------------------------
+containers:
+  - name: wiki
+    ports: '6902:6902'
+    ip: 10.88.0.200
+    drive_map: '/Library/wiki:/wiki'
+    command: '/bin/sh -c kiwix-serve -v -p 6902 --nodatealiases --library /wiki/wiki.xml'
+
+  - name: hotspot
+    ports: null
+    ip: null
+    drive_map: '/dev/bus/usb:/dev/bus/usb'
+    command: '/usr/bin/python3 /root/hotspot.py; sleep infinity'
+
+  - name: music
+    ports: '9099:5082'
+    ip: 10.88.0.210
+    drive_map: '/Library/music/:/music/:ro -v /Library/.music_data:/var/lms'
+    command: ''
+
+  - name: ebook
+    ports: '8083:8083'
+    ip: 10.88.0.211
+    drive_map: '/Library/calibre/books:/books:rw'
+    command: '/usr/local/bin/start-calibre-web.sh'
+
+  - name: music_player
+    ports: '2001:8080'
+    ip: 10.88.0.217
+    drive_map: '/Library/music:/music:ro'
+    command: ''
+
+  - name: webserver
+    ports: '80:80'
+    ip: 10.88.0.201
+    drive_map: '/Library:/library'
+    command: '/usr/bin/python3 /root/library.py;sleep infinity'
+
+  - name: library_maps
+    ports: '8080:8080'
+    ip: 10.88.0.212
+    drive_map: '/Library/maps:/storage/maps'
+    command: ''
+
+  # Radio containers are created by start_library.yml after USB discovery.
+  # Their device mapping and choice of meshtastic/meshflash are dynamic.
+
+  # GPS device access and ownership are configured by start_library.yml.
+  - name: street_zim
+    ports: '8093:8093'
+    ip: 10.88.0.216
+    drive_map: '/Library/wiki:/data:ro'
+    command: ''
+
+  - name: data_download
+    ports: '4826:4286'
+    ip: 10.88.0.215
+    drive_map: '/Library:/Library:rw'
+    command: ''

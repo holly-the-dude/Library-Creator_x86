@@ -1,0 +1,51 @@
+# library_maps stack: PMTiles map viewer (nginx) + GraphHopper car routing.
+# No Photon: address search is done in-browser against the loaded PMTiles, and
+# routing takes lat/lon or map-click points, so no geocoder service is needed.
+#
+# Run:
+#   podman compose up -d
+# Watch the first GraphHopper import:
+#   podman compose logs -f graphhopper
+
+services:
+  web:
+    image: localhost/library_maps:latest
+    build:
+      context: .
+      args:
+        BASE_IMAGE: "${BASE_IMAGE:-localhost/rasbase_master:latest}"
+    restart: unless-stopped
+    depends_on:
+      - graphhopper
+    ports:
+      - "${MAP_PORT:-8080}:8080"
+    # GPS_PORT is pinned to the u-blox receiver's persistent by-id path so
+    # discovery never claims the Meshtastic container's generic CP2102 serial
+    # device. GPS_BAUD must match the receiver. Host device access is opt-in
+    # through compose.gps.yaml, not these settings.
+    environment:
+      GPS_PORT: "${GPS_PORT:-/dev/serial/by-id/usb-u-blox_AG_-_www.u-blox.com_u-blox_7_-_GPS_GNSS_Receiver-if00}"
+      GPS_BAUD: "${GPS_BAUD:-9600}"
+    volumes:
+      # Writable so startup can seed missing fonts/sprites. Shared SELinux label:
+      # the downloader and routing container also use this drive's contents.
+      - "${MAPS_DIR:-/Library/maps}:/storage/maps:rw,z"
+
+  graphhopper:
+    image: localhost/library_maps-graphhopper:11
+    build:
+      context: ./graphhopper
+      args:
+        BASE_IMAGE: "${BASE_IMAGE:-localhost/rasbase_master:latest}"
+        GH_VERSION: "11.0"
+    restart: unless-stopped
+    environment:
+      JAVA_OPTS: "${GH_JAVA_OPTS:--Xms512m -Xmx3g}"
+    volumes:
+      # OSM PBF must be named region.osm.pbf inside this directory. It lives
+      # under the maps volume (/Library/maps/osm) so it rides the same mount.
+      - "${OSM_DIR:-/Library/maps/osm}:/data/osm:ro,Z"
+      # Persistent routing graph cache (built on first import).
+      - "${GRAPH_CACHE_DIR:-./data/graph-cache}:/data/graph-cache:Z"
+    expose:
+      - "8989"

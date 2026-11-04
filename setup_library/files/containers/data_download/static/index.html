@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Library Data Download</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header><div class="wrap topbar"><a id="home" href="/">LIBRARY <span>Content manager</span></a><span class="badge">Data Download</span></div></header>
+  <main class="wrap">
+    <section id="internet-status" class="panel" role="status" aria-live="polite"><h2 id="internet-message">Checking internet connection…</h2><p id="internet-detail">Uploads from this device work without internet. Download sources need an internet connection on the Pi.</p></section>
+    <div class="heading"><div><p class="eyebrow">BUILD YOUR OFFLINE LIBRARY</p><h1>Bring knowledge with you.</h1><p>Choose maps, routing data, offline ZIM collections, and PDF collections to save to your Library drive.</p></div><button id="refresh" class="secondary">Refresh sources</button></div>
+    <section class="panel storage" aria-labelledby="storage-title">
+      <div><h2 id="storage-title">Library USB drive</h2><p id="storage-text">Checking /Library…</p></div>
+      <div class="meter"><progress id="storage-meter" max="100" value="0" aria-label="Storage used"></progress><p id="storage-detail"></p></div>
+    </section>
+    <div id="notice" role="alert" hidden></div>
+    <section class="sources" id="sources" aria-label="Download sources"></section>
+    <section class="panel" aria-labelledby="catalog-title">
+      <div class="section-heading"><div><h2 id="catalog-title">Available downloads</h2><p id="destination">Maps save to /Library/maps/pmtiles</p></div><span id="count" class="badge">Checking sources…</span></div>
+      <div class="tabs" role="group" aria-label="Content type"><button data-source="maps" aria-pressed="true">OpenStreetMap tiles</button><button data-source="streetzim" aria-pressed="false">StreetZim maps</button><button data-source="routing" aria-pressed="false">Routing</button><button data-source="wiki" aria-pressed="false">ZIM Library</button><button data-source="survivor" aria-pressed="false">Survivor Library</button><button data-source="upload" aria-pressed="false">Upload files</button><button data-source="clone" aria-pressed="false">Clone</button></div>
+      <div id="download-panel">
+      <div class="filters"><label class="search">Search downloads<input id="search" type="search" placeholder="Search a title, topic, region, or language"></label><label><input id="fits" type="checkbox"> Fits available space</label><label id="latest-label" hidden><input id="latest" type="checkbox" checked> Latest editions only</label></div>
+      <div id="zim-filters" class="filters zim-filters" hidden>
+        <label>Language<select id="zim-language"><option value="">All languages</option><option value="eng" selected>English</option></select></label>
+        <label>Collection<select id="zim-category"><option value="">All collections</option></select></label>
+      </div>
+      <p class="hint" id="source-hint">Select regional PMTiles files for offline maps.</p>
+      <div class="table-scroll"><table><thead><tr><th scope="col"><input id="select-page" type="checkbox" aria-label="Select eligible files on this page"></th><th scope="col">File / collection</th><th scope="col">Download size</th><th scope="col">Status</th></tr></thead><tbody id="files"></tbody></table></div>
+      <div class="pager"><button id="previous" class="secondary">Previous</button><span id="page"></span><button id="next" class="secondary">Next</button></div>
+      <div class="selection"><div><strong id="selected">No files selected</strong><p>Downloads run one at a time. You can close this page while they continue.</p></div><button id="download" disabled>Download selected</button></div>
+      </div>
+      <section id="clone-panel" aria-label="Clone a drive" hidden>
+        <h3>Make a copy of your Library</h3>
+        <p>Choose what to copy. For the SD operating system, insert a spare SD card in a USB SD reader. For Library_USB content, insert a spare USB stick into the Library Pi.</p>
+        <label>Copy from <select id="clone-source"><option value="sd">SD card (bootable system)</option><option value="usb">Library_USB (content drive)</option></select></label>
+        <p>The destination only needs room for the used data plus filesystem overhead, even if the source drive is much larger. The SD copy does not include the separate Library_USB content drive.</p>
+        <p><strong>All data on the selected destination will be erased.</strong> Only unused, unmounted destinations are offered. OS clones require an SD card. Identified USB sticks and other media are blocked. If the reader cannot identify the card type, you must verify that the destination is an SD card and confirm that you are copying the operating system. The running SD card and Library_USB drive are protected.</p>
+        <button id="clone-scan">Scan for destination</button>
+        <p id="clone-capacity"></p>
+        <div id="clone-targets"></div>
+        <p id="clone-status" role="status" aria-live="polite"></p>
+        <div id="clone-progress-panel" hidden>
+          <progress id="clone-progress" max="100" aria-label="Clone progress" aria-describedby="clone-progress-text"></progress>
+          <p id="clone-progress-text" role="status" aria-live="polite"></p>
+        </div>
+        <p>Finish transfers first. Library readers will stop during the copy. Keep power and both drives connected until the destination is reported safely ejected. Then unplug only the destination; the Library will restart automatically and start its readers during boot. Leave the original drive connected. You can close this page and return to check progress.</p>
+      </section>
+      <section id="upload-panel" aria-label="Upload files" hidden>
+        <fieldset id="upload-controls">
+          <legend>Choose where to save your files</legend>
+          <div class="upload-types">
+            <label><input type="radio" name="upload-category" value="music" checked> Music files</label>
+            <label><input type="radio" name="upload-category" value="data"> Data files</label>
+            <label><input type="radio" name="upload-category" value="ebooks"> Ebooks</label>
+          </div>
+          <p id="upload-destination">Saves to /Library/music</p>
+          <div class="upload-pickers">
+            <label>Single or multiple files<input id="upload-files" type="file" multiple></label>
+            <label>A folder<input id="upload-folder" type="file" webkitdirectory multiple></label>
+          </div>
+        </fieldset>
+        <p class="hint">Folder structure is preserved. ZIP files are extracted in their destination folder, then removed. Existing files are kept; matching names cause an error. Extraction needs extra free space. Empty folders selected from your device are not uploaded.</p>
+        <ul id="upload-list" aria-label="Selected upload files"></ul>
+        <p id="upload-readiness" class="hint" role="status"></p>
+        <div class="selection"><div><strong id="upload-selected">No files selected</strong><p>Keep this page open and the USB drive connected until uploads finish.</p></div><button id="upload-start" disabled>Upload selected</button></div>
+        <progress id="upload-progress" max="100" value="0" aria-label="Upload progress" hidden></progress>
+        <p id="upload-status" role="status" aria-live="polite"></p>
+      </section>
+    </section>
+    <section class="panel" id="routing-panel" aria-labelledby="routing-title" hidden>
+      <h2 id="routing-title">Choose your routing region</h2>
+      <p>Download a region above, then choose it below. One region is active at a time. Switching the displayed map does not switch routing.</p>
+      <p id="routing-status" role="status"></p>
+      <div id="routing-downloads"></div>
+      <p>After choosing a region, shut down and restart the Library. Building directions can take time and needs extra USB space and RAM. A large state may not import on a small Pi.</p>
+    </section>
+    <section class="panel" aria-labelledby="queue-title"><div class="section-heading"><h2 id="queue-title">Download queue</h2><span id="queue-count" class="badge">0 active</span></div><div id="jobs"><p>No downloads queued yet.</p></div></section>
+    <footer>Internet access is needed on the Pi to discover and download files. Local uploads work offline. Saved content stays on your USB drive.<br>Keep the drive connected while uploads, downloads, or extraction are running.</footer>
+  </main>
+  <dialog id="clone-confirm" aria-labelledby="clone-confirm-title" aria-describedby="clone-confirm-message">
+    <h2 id="clone-confirm-title">Erase and clone destination</h2>
+    <p id="clone-confirm-message"></p>
+    <form id="clone-confirm-form">
+      <label for="clone-confirm-input">Type <strong id="clone-confirm-device" class="clone-device"></strong> to confirm.</label>
+      <input id="clone-confirm-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" autofocus>
+      <div class="clone-confirm-actions">
+        <button id="clone-confirm-cancel" type="button" class="secondary">Cancel</button>
+        <button id="clone-confirm-submit" type="submit" disabled>Erase and clone</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="music-reminder" aria-labelledby="music-reminder-title" aria-describedby="music-reminder-message">
+    <h2 id="music-reminder-title">Scan your uploaded music</h2>
+    <p id="music-reminder-message">In the music player, click on the Gear icon on the right → Scanner → Scan Now → click on Albums and refresh the browser for your music to show up.</p>
+    <form method="dialog"><button autofocus>Got it</button></form>
+  </dialog>
+  <dialog id="restart-reminder" aria-labelledby="restart-title" aria-describedby="restart-message">
+    <h2 id="restart-title">Restart the Library to use your new files</h2>
+    <p id="restart-message">New files have been saved. Restart the Library so the new files become available.</p>
+    <p>For routing downloads, first choose <strong>Use after restart</strong> in the Routing tab. Downloading a region alone does not activate it.</p>
+    <p>Restart Library stops the containers gracefully and reboots automatically. Keep the power connected. Routing may take time to build on startup.</p>
+    <p id="restart-status" role="status"></p>
+    <form method="dialog"><button class="secondary" autofocus>I'll restart later</button> <button type="button" id="restart-now" disabled>Restart Library</button></form>
+  </dialog>
+</body>
+</html>

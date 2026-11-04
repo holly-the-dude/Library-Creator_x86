@@ -1,0 +1,316 @@
+# Library-Creator
+
+**Your personal, portable digital library - in a box.**
+
+[![Donate](https://img.shields.io/badge/Donate-PayPal-blue?logo=paypal)](https://www.paypal.com/ncp/payment/T8MGW39TXCR4J)
+
+> **Don't want to build it yourself?** Get a ready-to-use, pre-configured kit at
+> **[librarydepository.com](https://librarydepository.com)** - it arrives ready to go, no assembly required.
+
+Library-Creator turns a Raspberry Pi into a self-contained knowledge station: your own
+little library that fits in the palm of your hand (it doesn't *run* from your hand - that
+would just be dumb). It hosts its own WiFi network and serves Wikipedia, a music and
+audiobook server, an e-book reader, offline maps with turn-by-turn driving directions,
+**Meshtastic Communications** for mesh messaging through a USB radio, and
+any files you can view in a browser (PDFs, images, videos, and more) - all with **no
+internet connection required**.
+
+Keep it to yourself or share it with anyone in range. Connect to the WiFi network named
+**`library`**, open **`http://library`**, and browse.
+
+> Inspired by the need for accessible information where the internet isn't - in the spirit
+> of sites like [survivorlibrary.com](https://www.survivorlibrary.com).
+
+---
+
+## Perfect for
+
+- <img src="docs/icons/png/camping.png" alt="" height="20" align="absmiddle"> **Camping trips** - entertainment and information in the great outdoors.
+- <img src="docs/icons/png/roadtrip.png" alt="" height="20" align="absmiddle"> **Road trips** - plug it into the car's power outlet and keep everyone occupied.
+- <img src="docs/icons/png/class.png" alt="" height="20" align="absmiddle"> **Presentations & classes** - hand out files and resources to a whole room, no network needed.
+- <img src="docs/icons/png/rural.png" alt="" height="20" align="absmiddle"> **Rural or remote areas** - get to information where there simply is no internet.
+- <img src="docs/icons/png/emergency.png" alt="" height="20" align="absmiddle"> **Emergencies** - stay informed when the internet is down, whether it's a storm, a
+  supply-chain hiccup, or the zombie/asteroid/whatever apocalypse of your choosing.
+- <img src="docs/icons/png/private.png" alt="" height="20" align="absmiddle"> **Private storage** - keep personal files on a device that never phones home.
+- <img src="docs/icons/png/tech.png" alt="" height="20" align="absmiddle"> **Tech enthusiasts** - because building your own library server is genuinely fun.
+
+---
+
+## Documentation
+
+Pick the guide that matches what you're doing:
+
+| Guide | For you if you want to… |
+|-------|--------------------------|
+| <img src="docs/icons/png/usage.png" alt="" height="18" align="absmiddle"> **[Usage Guide](docs/USAGE.md)** | **Use** a Library device that's already running - connect, browse Wikipedia, play music, read books, view maps, and send Meshtastic messages. No technical knowledge needed. |
+| <img src="docs/icons/png/install.png" alt="" height="18" align="absmiddle"> **[Install Guide](docs/INSTALL.md)** | **Build/set up** a device: flash the Pi, run the installer, and get a working Library. |
+| <img src="docs/icons/png/developer.png" alt="" height="18" align="absmiddle"> **[Dev Guide](docs/DEVELOPERS.md)** | **Understand or modify** how it works - architecture, container build pipeline, and adding new services. |
+
+Additional reference:
+
+- [TODO.md](TODO.md) - planned features and improvements.
+- [`bootstrap.md`](bootstrap.md) - complete reference for the installer script and its three boot stages.
+- Each service has its own README under [`setup_library/files/containers/`](setup_library/files/containers/):
+  [hotspot](setup_library/files/containers/hotspot/README.md),
+  [webserver](setup_library/files/containers/webserver/README.md),
+  [wiki](setup_library/files/containers/wiki/README.md),
+  [music](setup_library/files/containers/music/README.md),
+  [music_player](setup_library/files/containers/music_player/README.md),
+  [calibre-web](setup_library/files/containers/calibre-web/README.md),
+  [library_maps](setup_library/files/containers/library_maps/README.md),
+  [street_zim](setup_library/files/containers/street_zim/README.md),
+  [data_download](setup_library/files/containers/data_download/README.md),
+  [meshtastic](setup_library/files/containers/meshtastic/README.md),
+  [meshflash](setup_library/files/containers/meshflash/README.md).
+- [Display role](setup_library/roles/update_display/README.md) - the legacy HTTP status-message helper.
+- Historical material: [flasher design notes](setup_library/files/containers/meshflash/flash_tui.md)
+  and the [Meshtastic development conversation](setup_library/files/containers/meshtastic/conversation.md).
+  Use the service READMEs for current build and operating instructions.
+
+---
+
+## What's included
+
+| Service | Powered by | Client URL |
+|---------|-----------|------------|
+| <img src="docs/icons/png/web.png" alt="" height="20" align="absmiddle"> Web hub | nginx | `http://library` / `http://10.1.1.1` |
+| <img src="docs/icons/png/wiki.png" alt="" height="20" align="absmiddle"> Wikipedia | [Kiwix](https://kiwix.org/) | `http://10.1.1.1:6902` |
+| <img src="docs/icons/png/music.png" alt="" height="20" align="absmiddle"> Music library | [LMS](https://github.com/epoupon/lms) | `http://library/music` (automatic login); direct: `http://10.1.1.1:9099` |
+| <img src="docs/icons/svg/music_player.svg" alt="" height="20" align="absmiddle"> iPod-style player | Library Music, with Purple and Classic skins | `http://library:2001` / `http://10.1.1.1:2001` |
+| <img src="docs/icons/png/ebooks.png" alt="" height="20" align="absmiddle"> E-books | [Calibre-Web](https://github.com/janeczku/calibre-web) | `http://10.1.1.1:8083` |
+| <img src="docs/icons/png/maps.png" alt="" height="20" align="absmiddle"> OpenStreetMap | PMTiles + MapLibre + GraphHopper | `http://10.1.1.1:8080` |
+| <img src="docs/icons/svg/street_zim.svg" alt="" height="20" align="absmiddle"> StreetZim | Regional ZIM map archives with search and navigation | `http://library:8093` / `http://10.1.1.1:8093` |
+| <img src="docs/icons/svg/meshtastic.svg" alt="" height="20" align="absmiddle"> [Meshtastic Communications](docs/USAGE.md#meshtastic-communications) | Meshtastic web client + USB Lora Radio; meshflash for firmware setup | `http://library:8086` / `http://10.1.1.1:8086` |
+| <img src="docs/icons/svg/data_download.svg" alt="" height="20" align="absmiddle"> [Data Download](setup_library/files/containers/data_download/README.md) | Download map tiles, StreetZim maps, routing data, Kiwix ZIM collections, and Survivor Library collections; upload music, data, and ebooks to USB | `http://library:4826` / `http://10.1.1.1:4826` |
+| <img src="docs/icons/png/hotspot.png" alt="" height="20" align="absmiddle"> WiFi hotspot | hostapd + dnsmasq | SSID `library` (open) |
+
+The home page groups the players under **Music → Music library (LMS)** and
+**Music → iPod-style player**, and the map viewers under **Maps → OpenStreetMap**
+and **Maps → StreetZim**. Unavailable choices are labelled **Not running**.
+Both players read the same USB music folder. With the updated startup playbook,
+StreetZim owns the USB GPS when installed and healthy, and OpenStreetMap shares
+its feed. See the [Usage Guide](docs/USAGE.md) for controls and content setup.
+
+---
+
+## Meshtastic Communications
+
+Connect a Meshtastic radio to the **Raspberry Pi** and use your phone, tablet, or
+laptop to send and receive mesh messages through the Library's browser interface.
+Open **Meshtastic** from the home page or visit **`http://library:8086`**. Your
+browser connects to the Pi over WiFi; the attached radio communicates with other
+Meshtastic radios over LoRa. Messaging does not require internet or cellular service.
+
+You need a compatible USB radio, antenna, data cable, and another reachable
+Meshtastic node with compatible settings. Use one active browser connection to
+the Library radio at a time. If no configured radio responds, the same address
+offers the offline firmware setup terminal for supported ESP32 boards.
+
+First startup and connection can take a hot minute while the radio initializes
+and discovers nodes. Check the [bridge status](http://10.1.1.1:8086/bridge/status):
+`"ready": true` means the radio bridge is ready to connect.
+
+Follow [Meshtastic Communications in the Usage Guide](docs/USAGE.md#meshtastic-communications)
+for connecting, sending messages, checking nodes, and setting up a new radio.
+
+---
+
+## Downloading content
+
+Select **Downloads** on the home page, after **Meshtastic** and before
+**Shutdown**, or open **http://10.1.1.1:4826**. When the `data_download` image is
+installed, Library startup launches it automatically before the webserver.
+
+The downloader checks the USB drive's available space and lets you choose:
+
+- **OpenStreetMap tiles**: regional PMTiles maps → `/Library/maps/pmtiles/`
+- **StreetZim maps**: regional map archives → `/Library/wiki/`
+- Routing extracts → `/Library/maps/osm/` (choose a region to use after restart)
+- **ZIM Library**: Wikipedia and other Kiwix collections → `/Library/wiki/`
+- Survivor Library category ZIP collections, extracted as PDFs → `/Library/library/`
+
+**ZIM Library** starts with English selected and offers language, collection,
+and latest-edition filters. **Maps (ZIM)** selects Kiwix map collections; these
+do not provide the PMTiles viewer's layers or GraphHopper directions. For
+StreetZim, use its separate download tab, restart the Library after downloading,
+then open **Maps → StreetZim → Open map library**.
+
+The Pi needs internet access to discover and download new content. While offline,
+the page displays **"No Internet, its really hard to go on like this"** and checks
+again every **30 seconds**. Reading previously downloaded content works offline.
+After downloads finish, a popup offers **Restart Library** or **I'll restart
+later** so new files become available in its readers. Restart stops containers
+gracefully and reboots automatically; keep the power connected. Existing builds
+need the [host restart handler](setup_library/files/containers/data_download/docs/RESTART.md)
+and an updated downloader before this button is enabled.
+
+The maps container bundles its required fonts and sprites and copies missing files
+onto the USB drive at startup, preserving existing files. See
+[automatic map asset setup](setup_library/files/containers/library_maps/README.md#automatic-font-and-sprite-setup).
+
+Driving directions use separate OpenStreetMap extracts from
+[Geofabrik](https://download.geofabrik.de/). See the
+[routing data guide](setup_library/files/containers/data_download/docs/ROUTING.md)
+for download locations and setup. In the **Routing** tab, download a US region
+and choose **Use after restart**. The next Library startup activates that region
+and builds its directions; allow extra time, RAM, and storage for the import.
+
+Thanks to Project N.O.M.A.D., Pendia, Protomaps, OpenStreetMap contributors, and
+Rocky at Survivor Library for making this content accessible. Years ago, I shared
+an alpha version of this project with Rocky, and he was okay with what I was
+building. A small portion of full-kit proceeds may be donated to Survivor Library.
+See the [source acknowledgments and license notes](setup_library/files/containers/data_download/README.md#source-acknowledgments-and-availability)
+for details, including source availability and the discretionary donation policy.
+
+See the [downloader setup guide](setup_library/files/containers/data_download/README.md)
+for building, deployment, Python/API documentation, and troubleshooting. Existing
+installations also need the corrected `start_library.service` so container log
+monitors survive the end of startup; see the
+[empty-response repair notes](setup_library/files/containers/data_download/README.md#if-the-container-runs-but-the-browser-gets-an-empty-reply).
+
+### Uploading your own files
+
+Select **Upload files** in Downloads.
+Choose **Music files**, **Data files**, or **Ebooks**, then select a single file,
+multiple files, or a folder and press **Upload selected**. Local uploads work
+without internet; keep the browser page open and the USB drive connected until
+the upload finishes.
+
+| Upload choice | Destination on the Library |
+| --- | --- |
+| Music files | `/Library/music` |
+| Data files | `/Library/library` |
+| Ebooks | `/Library/calibre/put_new_books_here` |
+
+Folder structure is preserved. Uploaded ZIPs are extracted into the chosen
+destination, preserving paths inside the archive, then removed. Existing files
+are kept; a conflicting filename stops the batch. The page shows upload progress
+and reports any errors.
+
+After music uploads, a popup gives the next steps in **Music library (LMS)**:
+**Gear icon on the right → Scanner → Scan Now → Albums → refresh the browser**.
+In the **iPod-style player**, choose **Rescan music folder** instead.
+After data or ebook uploads, a popup offers **Restart Library** or **I'll restart
+later** once active transfers finish.
+
+The USB capacity panel has a light-blue background. Selected tabs and upload
+categories use a gold **`#f3b41e`** background with dark text; selected download
+rows have a brighter purple background and a gold marker on the left.
+
+### Deleting files from the USB drive
+
+The fastest way to delete files is to **power down the Library, put its USB stick
+in another computer, and delete the files there**:
+
+1. Finish active transfers, then use **Shutdown** on the Library home page.
+2. Wait for **OK to power off**, disconnect power, and remove the USB stick.
+3. Insert it into another computer and delete the content files or folders you
+   no longer want using that computer's file manager.
+4. Safely eject the USB stick, reconnect it to the powered-off Library, and turn
+   the Library back on.
+
+`/Library` is the drive's mount point on the Pi; on another computer, open the
+USB drive itself to find folders such as `music`, `library`, and `calibre`.
+The downloader does not yet offer file/folder deletion in its interface. See
+[TODO.md](TODO.md) for planned features and the
+[Usage Guide](docs/USAGE.md#deleting-files-from-the-usb-drive) for more details.
+
+---
+
+## How it works (in one picture)
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#1565c0","primaryTextColor":"#ffffff","primaryBorderColor":"#0d47a1","secondaryColor":"#4b5563","secondaryTextColor":"#ffffff","tertiaryColor":"#4b5563","tertiaryTextColor":"#ffffff","textColor":"#ffffff","lineColor":"#22c55e","defaultLinkColor":"#22c55e","clusterBkg":"#4b5563","clusterBorder":"#9ca3af","titleColor":"#ffffff","edgeLabelBackground":"#4b5563","noteBkgColor":"#4b5563","noteTextColor":"#ffffff"}}}%%
+flowchart TB
+    client("Phone, tablet, or laptop")
+    subgraph pi["Raspberry Pi"]
+        hotspot("WiFi: library<br/>10.1.1.1 · hostapd + dnsmasq")
+        hub("Library web hub<br/>http://library")
+        subgraph services["Podman services"]
+            wiki("Wiki / Kiwix<br/>Port 6902")
+            lms("Music library / LMS<br/>Hub /music · Port 9099")
+            player("iPod-style player<br/>Port 2001")
+            books("Calibre-Web<br/>Port 8083")
+            maps("OpenStreetMap<br/>Port 8080")
+            routing("GraphHopper<br/>Internal port 8989")
+            street("StreetZim<br/>Port 8093")
+            mesh("Meshtastic or meshflash<br/>Port 8086")
+            downloads("Downloads and uploads<br/>Port 4826")
+        end
+        hotspot --> hub
+        hub -->|"Service menus and links"| services
+        maps -->|"Driving directions"| routing
+        maps -->|"Shared GPS when StreetZim is healthy"| street
+    end
+    client -->|"Join WiFi"| hotspot
+    usb[("USB content drive<br/>Mounted at /Library")] --- services
+    gps("USB GPS receiver") --- street
+    radio("USB radio") --- mesh
+
+    classDef default fill:#1565c0,stroke:#0d47a1,color:#ffffff,stroke-width:2px,rx:10,ry:10;
+    linkStyle default stroke:#22c55e,stroke-width:4px,color:#ffffff
+    style pi fill:#4b5563,stroke:#9ca3af,color:#ffffff,stroke-width:2px,rx:12,ry:12;
+    style services fill:#4b5563,stroke:#9ca3af,color:#ffffff,stroke-width:2px,rx:12,ry:12;
+```
+
+Everything runs as Podman containers on the Pi. Content lives on a USB drive, so the
+images stay stateless. See the [Developer Guide](docs/DEVELOPERS.md) for the full picture.
+
+At startup, a radio that answers the Meshtastic protocol opens the Meshtastic client
+on port 8086. If no radio answers, the same address offers firmware setup. Plug the
+radio into the **Pi**, not the browser computer. The bridge never flashes firmware;
+meshflash requires confirmation. After setup finishes, reboot or rerun the radio
+startup check. See [Meshtastic Communications](docs/USAGE.md#meshtastic-communications).
+
+---
+
+## Quick start
+
+```bash
+# On a Raspberry Pi running Raspberry Pi OS (64-bit), as root:
+cd /root
+git clone https://github.com/holly-the-dude/Library-Creator.git
+cd Library-Creator
+./bootstrap        # choose "1) Fresh Install"
+```
+
+The installer handles everything else across three automatic boot stages. Full steps and
+requirements are in the [Installation Guide](docs/INSTALL.md).
+
+---
+
+## Requirements
+
+- Raspberry Pi 3, 4, or 5 with Raspberry Pi OS (64-bit) - Bullseye, Bookworm, or Trixie
+- A USB drive for content (reformatted to exFAT during install)
+- An optional TFT or HDMI display for boot status
+- For mesh messaging: a USB Meshtastic radio, suitable antenna, and USB data cable
+- For offline firmware installation: an ESP32-family radio supported by meshflash
+- Internet during installation and when downloading new content; browsing stored content works offline
+
+
+---
+
+## The Idea
+
+We like things clean and simple. A Library device doesn't track you, doesn't use cookies,
+and doesn't phone home - it's a straightforward experience, just like the internet used to
+be. Your library is *yours*.
+
+---
+
+## Support
+
+If Library-Creator is useful to you, consider [supporting development via PayPal](https://www.paypal.com/ncp/payment/T8MGW39TXCR4J). Thank you!
+
+Prefer a ready-made device? Pre-configured kits are available at [librarydepository.com](https://librarydepository.com).
+
+## Optional Office apps
+
+Bootstrap offers WordCraft, DeckCraft, and GridCraft as an optional add-on,
+disabled by default. Use a browser device with **a keyboard and a mouse,
+touchscreen, or trackpad**. Enabled Office opens over **HTTPS on port 3001**;
+files saved in `/documents` live in `/Library/documents` on the Library drive.
+The `:dontrun` image tag disables startup and the homepage omits unavailable
+Office. See the [Office guide](setup_library/files/containers/craft_apps/README.md)
+for enabling, disabling, and storage details.

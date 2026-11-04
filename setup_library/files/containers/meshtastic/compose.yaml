@@ -1,0 +1,20 @@
+services:
+  meshtastic:
+    image: localhost/meshtastic:latest
+    container_name: meshtastic
+    build:
+      context: .
+      dockerfile: Containerfile
+      args:
+        BASE_IMAGE: "${BASE_IMAGE:-localhost/rasbase_master:latest}"
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    devices:
+      - "${MESHTASTIC_DEVICE:?Set MESHTASTIC_DEVICE to the detected radio path}:/dev/meshtastic:rwm"
+    environment:
+      SERIAL_DEVICE: /dev/meshtastic
+      DATA_DIR: /var/lib/meshtastic
+      DISCOVERY_SECONDS: "${DISCOVERY_SECONDS:-60}"
+    volumes:
+      - "${MESHTASTIC_DIR:-/Library/meshtastic}:/var/lib/meshtastic:Z"

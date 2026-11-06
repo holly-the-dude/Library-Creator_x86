@@ -1,5 +1,5 @@
-# library_maps - PMTiles map tile server for Raspberry Pi
-# Based on rasbase_master (Debian 13 trixie arm64)
+# library_maps - PMTiles map tile server for Debian PCs
+# Based on rasbase_master (Debian 13 trixie amd64)
 # Serves .pmtiles files via nginx with HTTP range request support
 # Compatible with MapLibre GL JS clients
 
@@ -8,7 +8,7 @@
 ARG BASE_IMAGE=localhost/rasbase_master:latest
 FROM ${BASE_IMAGE}
 
-LABEL description="PMTiles map tile server for offline maps on Raspberry Pi"
+LABEL description="PMTiles map tile server for offline maps on Debian PCs"
 
 # Python reads the appliance's serial GPS; nginx exposes its status to clients.
 RUN apt-get update && \
@@ -20,10 +20,15 @@ RUN apt-get update && \
         python3-serial \
     && rm -rf /var/lib/apt/lists/*
 
-# Install go-pmtiles for arm64
+# Install go-pmtiles for the image architecture
 ARG PMTILES_VERSION=1.30.2
 RUN set -eux; \
-    TARBALL="go-pmtiles_${PMTILES_VERSION}_Linux_arm64.tar.gz"; \
+    case "$(dpkg --print-architecture)" in \
+        amd64) PMTILES_ARCH=x86_64 ;; \
+        arm64) PMTILES_ARCH=arm64 ;; \
+        *) echo 'Unsupported PMTiles architecture' >&2; exit 1 ;; \
+    esac; \
+    TARBALL="go-pmtiles_${PMTILES_VERSION}_Linux_${PMTILES_ARCH}.tar.gz"; \
     cd /tmp; \
     curl -fsSL -o "$TARBALL" \
       "https://github.com/protomaps/go-pmtiles/releases/download/v${PMTILES_VERSION}/${TARBALL}"; \

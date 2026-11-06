@@ -1,0 +1,102 @@
+---
+- name: Install Library services on Debian amd64
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  become: true
+  tasks:
+    - name: Require Debian Trixie amd64
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.distribution == 'Debian'
+          - ansible_facts.distribution_release == 'trixie'
+          - ansible_facts.architecture == 'x86_64'
+
+    - name: Load storage settings
+      ansible.builtin.include_vars: /etc/library/config.json
+
+    - name: Persist the selected content mount without remounting it
+      when: library_storage_mode == 'mounted'
+      block:
+        - name: Inspect the mounted filesystem
+          ansible.builtin.command:
+            argv: [findmnt, --json, --target, /Library, --output, "UUID,FSTYPE,OPTIONS,TARGET"]
+          register: library_mount
+          changed_when: false
+
+        - name: Read mounted filesystem details
+          ansible.builtin.set_fact:
+            library_filesystem: "{{ (library_mount.stdout | from_json).filesystems[0] }}"
+
+        - name: Require an identifiable mount at the resolved content path
+          ansible.builtin.assert:
+            that:
+              - library_filesystem.uuid | default('', true) | length > 0
+              - library_filesystem.target == library_storage_path
+
+        - name: Record the existing mount by UUID for subsequent boots
+          ansible.posix.mount:
+            path: "{{ library_storage_path }}"
+            src: "UUID={{ library_filesystem.uuid }}"
+            fstype: "{{ library_filesystem.fstype }}"
+            opts: "{{ (library_filesystem.options.split(',') + ['nofail']) | unique | join(',') }}"
+            state: present
+            backup: true
+
+    - name: Create startup unit override directory
+      ansible.builtin.file:
+        path: /etc/systemd/system/start_library.service.d
+        state: directory
+        mode: '0755'
+
+    - name: Order startup after the resolved content mount
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/start_library.service.d/storage.conf
+        mode: '0644'
+        content: |
+          [Unit]
+          RequiresMountsFor="{{ library_storage_path }}"
+
+    - name: Install boot playbook
+      ansible.builtin.copy:
+        src: files/start_library.yml
+        dest: /root/start_library.yml
+        mode: '0644'
+
+    - name: Install host control helpers
+      ansible.builtin.copy:
+        src: "files/{{ item }}"
+        dest: "/usr/local/bin/{{ item }}"
+        mode: '0755'
+      loop: [library_control.py, library_restart, library_shutdown.py, library_shutdown]
+
+    - name: Install systemd services
+      ansible.builtin.copy:
+        src: "files/{{ item }}"
+        dest: "/etc/systemd/system/{{ item }}"
+        mode: '0644'
+      loop:
+        - start_library.service
+        - shutdown_library.service
+        - library-control.socket
+        - library-control.service
+        - library-restart.service
+
+    - name: Enable host control services
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+        daemon_reload: true
+      loop: [library-control.socket, shutdown_library.service]
+
+    - name: Install USB clone support
+      ansible.builtin.import_tasks: clone_tasks.yml
+      tags: [clone_service]
+
+    - name: Start or refresh Library
+      ansible.builtin.systemd_service:
+        name: start_library.service
+        enabled: true
+        state: restarted
+        daemon_reload: true

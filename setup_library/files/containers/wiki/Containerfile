@@ -7,19 +7,20 @@
 ARG BASE_IMAGE=localhost/rasbase_master:latest
 FROM ${BASE_IMAGE}
 
-# Build the skin from the exact bundled binary without running ARM code.
-RUN apt-get update && apt-get install -y --no-install-recommends python3 && \
+# Use the matching x86 release, retaining the exact Kiwix version and theme.
+RUN apt-get update && apt-get install -y --no-install-recommends python3 curl ca-certificates && \
     rm -rf /var/lib/apt/lists/*
-
-# Copy the pre-compiled kiwix-tools binary archive (aarch64 static builds)
-COPY kiwix-tools_linux-aarch64-3.5.0-1.tar.gz /tmp/kiwix-tools.tar.gz
-
-# Extract kiwix binaries to /usr/local/bin and clean up
-RUN tar -xzf /tmp/kiwix-tools.tar.gz -C /tmp && \
-    cp /tmp/kiwix-tools_linux-aarch64-3.5.0-1/kiwix-serve /usr/local/bin/ && \
-    cp /tmp/kiwix-tools_linux-aarch64-3.5.0-1/kiwix-manage /usr/local/bin/ && \
-    cp /tmp/kiwix-tools_linux-aarch64-3.5.0-1/kiwix-search /usr/local/bin/ && \
+ARG KIWIX_VERSION=3.5.0-1
+ARG KIWIX_SHA256=da50fc74d3d134b80e0fb9c43c5ea0c2cda0681f5b41c7ba6bdeb4a03afdc57c
+RUN test "$(dpkg --print-architecture)" = amd64 && \
+    curl -fsSL --retry 5 \
+      "https://download.kiwix.org/release/kiwix-tools/kiwix-tools_linux-x86_64-${KIWIX_VERSION}.tar.gz" \
+      -o /tmp/kiwix-tools.tar.gz && \
+    echo "${KIWIX_SHA256}  /tmp/kiwix-tools.tar.gz" | sha256sum -c - && \
+    tar -xzf /tmp/kiwix-tools.tar.gz -C /tmp && \
+    cp /tmp/kiwix-tools_linux-x86_64-${KIWIX_VERSION}/kiwix-* /usr/local/bin/ && \
     chmod +x /usr/local/bin/kiwix-* && \
+    /usr/local/bin/kiwix-serve --version && \
     rm -rf /tmp/kiwix-tools*
 
 COPY build_theme.py library-theme.css /opt/library-wiki/

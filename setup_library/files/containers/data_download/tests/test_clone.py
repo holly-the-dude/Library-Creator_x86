@@ -121,6 +121,26 @@ class CloneSafetyTests(unittest.TestCase):
         self.assertEqual(self.cloner.status()['status'], 'failed')
 
 
+class DebianCloneTests(unittest.TestCase):
+    def test_usb_scan_does_not_require_a_pi_boot_mount(self):
+        with patch.object(host.shutil, 'which', return_value='/usr/bin/tool'), \
+                patch.object(host, 'inventory', return_value=[]), \
+                patch.object(host, 'source_info', return_value=({'kind': 'usb'}, {'/dev/sda', '/dev/sdb'})), \
+                patch.object(host.os.path, 'ismount', return_value=False), \
+                patch.object(host, 'mounted_device') as mounted:
+            info, targets = host.inspect('usb')
+            self.assertEqual(info['kind'], 'usb')
+            self.assertEqual(targets, [])
+            mounted.assert_not_called()
+
+    def test_x86_service_rejects_os_clone_before_device_access(self):
+        with patch.dict(os.environ, {'LIBRARY_CLONE_USB_ONLY': '1'}), \
+                patch.object(host, 'mounted_device') as mounted:
+            with self.assertRaisesRegex(ValueError, 'BIOS/UEFI'):
+                host.source_info('sd', [])
+            mounted.assert_not_called()
+
+
 class MediaTests(unittest.TestCase):
     def test_usb_reader_capability_name_and_removable_flag_do_not_prove_sd_media(self):
         device = disk()

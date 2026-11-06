@@ -1,5 +1,6 @@
 """Validate resource generation against the shipped ARM binary without running it."""
 import importlib.util
+import os
 from pathlib import Path
 import tarfile
 import tempfile
@@ -14,7 +15,7 @@ spec.loader.exec_module(theme_builder)
 class ThemeBuildTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        with tarfile.open(ROOT / "kiwix-tools_linux-aarch64-3.5.0-1.tar.gz") as archive:
+        with tarfile.open(os.environ.get("KIWIX_TEST_ARCHIVE", ROOT / "kiwix-tools_linux-aarch64-3.5.0-1.tar.gz")) as archive:
             member = next(item for item in archive.getmembers() if item.name.endswith("/kiwix-serve"))
             cls.binary = archive.extractfile(member).read()
 

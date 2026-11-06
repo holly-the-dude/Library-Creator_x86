@@ -44,9 +44,9 @@ owner if it is not root.
 
 ## Bootstrap opt-in and startup
 
-Fresh Install and Restart Install ask **Enable the Office add-on? [y/yes/N]**
-after the display choice and explain the input-device requirement. The default
-is No. The build retains the image for later offline use either way:
+The x86 bootstrap accepts `--office yes` or `--office no` and remembers the
+choice. The default is No. Clients need a keyboard and pointing device. The
+build retains the image for later offline use either way:
 
 | Choice / tags | Startup behavior |
 | --- | --- |
@@ -55,12 +55,9 @@ is No. The build retains the image for later offline use either way:
 | Both tags | `:dontrun` wins; Office stays disabled |
 | Neither tag | Skip Office |
 
-To change the choice on an existing Library, use **6) Configure Office** in
-bootstrap or `sudo bash /path/to/checkout/bootstrap --configure-office`. Save
-open documents before applying the change. This uses the installed image; it
-does not run a full reinstall. Restart the Library afterward to apply startup
-and regenerate the homepage. The updated startup playbook and webserver image
-must already be deployed on an older appliance.
+To change the remembered choice without rebuilding images, choose **Configure
+Office** in bootstrap, or run `sudo ./bootstrap --configure-office yes` or
+`sudo ./bootstrap --configure-office no` from the x86 checkout. Save open documents before applying the change.
 
 For manual changes from this directory:
 

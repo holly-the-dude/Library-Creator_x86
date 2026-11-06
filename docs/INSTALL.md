@@ -1,415 +1,167 @@
-# Installation Guide
+# Install on Debian 13 (Trixie), amd64
 
-This guide is for people who want to build a **Library** device - a self-contained,
-offline "library in a box" that runs on a Raspberry Pi and serves Wikipedia, music,
-e-books, and offline maps over its own WiFi hotspot. No internet connection is needed
-by the people who use it.
+Use an existing Debian **amd64** install on a PC or VM. Trixie's i386 packages
+are for compatibility on amd64; this installer does not support a 32-bit OS.
+Debian's installer handles UEFI/BIOS, disks, firmware, Ethernet, Wi-Fi, and HDMI.
+The Library installer does not upgrade the host distribution.
 
-If you are a developer wanting to understand or modify how the system is built, read
-[DEVELOPERS.md](DEVELOPERS.md) instead. Once your device is running, see
-[USAGE.md](USAGE.md) for how to use it.
+Internet access is required for the initial image builds. Allow substantial
+free disk space for container layers and content; the Office image and routing
+imports are especially large. Routing memory depends on the chosen OSM region.
 
----
+## Install
 
-## What you are building
-
-When installation finishes, the Raspberry Pi will:
-
-- Broadcast an **open WiFi network named `library`**.
-- Serve a web home page at **`http://library`** (or `http://10.1.1.1`) to anyone who connects.
-- Offer Wikipedia, a music player, an e-book reader, and offline maps with turn-by-turn
-  driving directions - all offline.
-- Show status messages on an attached TFT screen (or HDMI monitor) while it boots.
-- Offer **Meshtastic Communications** at `http://library:8086`: the radio client when a USB radio answers,
-  or the firmware setup terminal when no Meshtastic radio answers.
-
----
-
-## Requirements
-
-### Hardware
-
-| Item | Notes |
-|------|-------|
-| Raspberry Pi | Pi 3 (dont expect speed), Pi 4, or Pi 5 (2gb works) |
-| microSD card | 32 GB or larger, for Raspberry Pi OS and install files|
-| USB drive | Holds the library content (Wikipedia, music, books, maps). Larger is better - content can ginormous |
-| Display | A 3.5" TFT, 2.4" TFT, or an HDMI monitor. The display is optional but recommended for seeing boot status |
-| Power supply | The official supply for your Pi model |
-| Meshtastic radio (optional) | USB radio, matching antenna and data cable; ESP32 required for the bundled firmware flasher |
-| GPS receiver (optional) | USB NMEA receiver for maps; this is a separate device from the Meshtastic radio |
-
-### Software
-
-- **Raspberry Pi OS** (64-bit, Debian-based). Bullseye, Bookworm, and Trixie are all supported - the installer detects Trixie and applies compatibility fixes automatically.
-- Dont skimp select the "Raspberry Pi Desktop, cause you can hook up a monitor mouse,keyboard an still use this thing
-- Network access **during installation only** (WiFi or Ethernet) so the Pi can download packages and container base images. The finished device does not need internet.
-- Root access on the Pi.
-
----
-
-## Step 1 - Flash Raspberry Pi OS
-
-1. Use [Raspberry Pi Imager](https://www.raspberrypi.com/software/) to flash Raspberry Pi OS (64-bit) to your microSD card.
-2. In the Imager settings, enable SSH and DO NOT configure wifi.
-1. insert the microsd card
-2. plug in your usb drive
-3. install the tft display or hdmi video
-4. connect the pi's ethernet port to an active port on your router
-3. Boot the Pi and log in as `root` (or use `sudo bash` to become root).
-
-## Step 2 - Get the installer onto the Pi
-
-Clone this repository into root's home directory:
+Copy this complete x86 checkout to the target machine and run from that copy:
 
 ```bash
-cd /root
-git clone https://github.com/holly-the-dude/Library-Creator.git
+./bootstrap --check
+sudo ./bootstrap
 ```
 
-That's all you need to do. You'll run the installer directly from the cloned repository in
-Step 4 - during First Boot it copies itself to `/root/bootstrap` automatically so the
-auto-resume cron job (`/root/bootstrap`) can pick it up after each reboot. You do
-not need to copy or `chmod` anything by hand.
+`--check` validates the host without installing packages. `sudo ./bootstrap`
+opens the interactive menu. Choose Fresh Install, select the USB partition
+(`/dev/sdb1` on libraryd) and Office preference, then confirm. Installation stages
+this checkout under `/opt/library-creator`, builds the base and applications,
+installs systemd units, and starts the Library. It requires no boot-stage cron
+jobs or automatic reboot. A failed image build stops installation before the
+new host configuration and services are installed.
 
-## Step 3 - Attach the USB drive
+Open `http://localhost` on the machine, or `http://<machine-IP>` from another
+computer. The existing hostname is preserved. Use `hostname -I` to see addresses.
+Content can be added through Downloads at `http://<machine-IP>:4826`.
 
-Plug in the USB drive that will hold your library content.
+## Storage
 
-> ⚠️ **Warning:** During a fresh install, any inserted USB drive that is **not** already
-> labeled `Library_USB` will be **reformatted** (as exFAT). The installer gives you a
-> 30-second countdown to remove it if you plugged in the wrong drive. Make sure the drive
-> holds nothing you want to keep.
-
-If your drive is already set up as `Library_USB` from a previous install, it will be left
-alone.
-
-## Step 4 - Run the installer
-
-Run it straight from the cloned repository:
+The default is a normal `/Library` directory on the current filesystem:
 
 ```bash
-cd /root/Library-Creator
-./bootstrap
+sudo ./bootstrap --storage directory
 ```
 
-You will see the main menu:
-
-```
-╔══════════════════════════════════════════════════╗
-║       Library Bootstrap Installer                ║
-║       Raspberry Pi Edition                       ║
-╚══════════════════════════════════════════════════╝
-
-  Main Menu
-──────────────────────────────────────────────────
-  1) Fresh Install          - Full installation from scratch
-  2) Reinstall / Upgrade    - Git pull, then reinstall cleanup
-  3) Restart Install        - Clear boot flags and install from scratch
-  4) System Status          - Check installation progress
-  q) Quit
-──────────────────────────────────────────────────
-```
-
-Choose **`1) Fresh Install`**. You will be asked:
-
-1. **Display type** - pick what is attached:
-   - `1)` TFT 3.5" (480×320)
-   - `2)` TFT 2.4" (320×240)
-   - `3)` HDMI, auto-scaled status messages
-   - `4)` HDMI desktop (Pi desktop + kiosk browser)
-2. **HDMI resolution** (HDMI modes only) - `Auto-scale` is recommended; the Pi reads the monitor's native resolution automatically.
-3. **Confirmation** - review the summary and confirm to begin.
-
-## Step 5 - Let it run (three boot stages)
-
-Installation runs in **three stages, each separated by an automatic reboot**. The
-installer sets up a cron job that resumes the next stage automatically after each reboot,
-so you can leave it alone.
-Once it starts running its borring lots of updates and installs, and time. If you have chosen a fast microsd card then it will be faster.
-you can always get a cup of coffee!
-
-| Stage | What happens |
-|-------|--------------|
-| **First Boot** | Formats the USB, downloads content, installs packages (Python, Ansible, Podman), configures the display, builds the containers, sets WiFi country, then reboots |
-| **Second Boot** | Shows a "configuring" splash, runs the Ansible playbook that installs and wires up all services, then reboots |
-| **Third Boot** | Removes the resume cron job, shows the "ready" splash, cleans up temporary network config, and reboots into production mode |
-
-The TFT/HDMI display shows progress messages throughout. Total time depends on your Pi,
-network speed, and how much content is downloaded - expect anywhere from 30 minutes to a
-couple of hours.
-
-## Step 6 - Verify it worked
-
-When the final boot finishes:
-
-1. On another device (phone, laptop), look for an **open WiFi network named `library`** and connect to it.
-2. Open a browser to **`http://library`** (or `http://10.1.1.1`).
-3. You should see the Library home page with links to whatever content you installed.
-4. Open **Music** to choose **Music library (LMS)** or **iPod-style player**, and
-   **Maps** to choose **OpenStreetMap** or **StreetZim**. A choice labelled
-   **Not running** did not pass its service check. StreetZim and the iPod-style
-   player can open with empty content folders when their images are installed.
-
-You can also check status directly on the Pi:
+For a separate content disk, mount it at `/Library` yourself (or symlink
+`/Library` to the mounted directory), and select mounted storage:
 
 ```bash
-./bootstrap
-# choose 4) System Status
+sudo ./bootstrap --storage mounted
 ```
 
-The status screen reports stage flags as `COMPLETE`. These flags alone do not
-prove every task succeeded; check the installation logs if services are missing.
+An already mounted `/Library` is detected automatically on a fresh install.
+Mounted mode refuses to start without that mount. The installer preserves a
+`/Library` symlink, records the resolved filesystem mount by UUID in `/etc/fstab`
+(with a backup), and orders startup after that mount. Existing mount options,
+including exFAT ownership, are retained. Filesystems such as ext4
+and exFAT work through the host mount; no `/dev/sda1` or USB-only assumption is
+made. The installer formats only an explicitly selected partition after a typed
+erase confirmation and a 30-second countdown. Already-labelled Library_USB
+content is preserved on normal install. It never guesses an expendable disk. USB-content cloning is available through Downloads and the Install / Repair
+Clone menu. OS cloning still requires separate UEFI/BIOS support.
 
----
+Existing content is retained. The familiar folders include `library`, `wiki`,
+`music`, `calibre`, `maps`, and `documents`. The downloader creates its own
+additional directories as needed. `/etc/library/config.json` remembers storage
+and Office choices for subsequent installs.
 
-## Set up the Meshtastic radio
+## Ethernet, Wi-Fi and VMs
 
-For messaging after setup, follow [Meshtastic Communications](USAGE.md#meshtastic-communications).
-Prepare a second reachable radio for an exchange of test messages. Set the LoRa
-region for the installation location and match your group's radio/channel settings.
-The bridge preserves an already-configured region; for an unset radio it applies
-`LORA_REGION` (default `US`). Configure that default before first provisioning an
-appliance elsewhere; see the [radio defaults](../setup_library/files/containers/meshtastic/README.md#hardware-and-firmware).
+Default installation uses whichever connections Debian already has. It does
+not disable NetworkManager, rewrite `/etc/network/interfaces`, rename network
+interfaces, change the hostname, or require an adapter named `eth0` or `wlan0`.
+A laptop can use Ethernet and Wi-Fi simultaneously as configured by Debian.
 
-Both radio images and their launchers use port 8086. When updating an existing
-installation, rebuild the image, deploy the updated playbook and recreate the
-container; see [flasher upgrades](../setup_library/files/containers/meshflash/README.md#port-configuration-and-upgrades).
+For a VM, a bridged virtual NIC lets other LAN clients connect to the VM's IP.
+With NAT, configure forwarding in the hypervisor for the ports you use. No
+Wi-Fi passthrough is needed unless the VM itself must broadcast a hotspot.
+USB GPS and radios need hypervisor USB passthrough to be visible inside a VM.
 
-1. Plug the radio into the **Pi** with a data-capable USB cable and attach its antenna.
-2. Open `http://library:8086` (or `http://10.1.1.1:8086`). A radio already running
-   Meshtastic opens the web client; choose an **HTTP** connection to `library:8086`.
-3. If the setup terminal appears, select the radio's serial port, exact board model,
-   firmware version, and operation. Erase & install removes the radio's settings and keys.
-4. Wait for completion and let the radio reboot. Reboot the Pi, or run as root over SSH:
-
-   ```sh
-   ansible-playbook /root/start_library.yml --tags mesh
-   ```
-
-The check stops both radio containers, probes again, and starts the selected service.
-Do not run it while a flash is in progress. Selection happens at startup or on this
-command, not continuously while the browser is open. No responding radio also offers
-setup when no radio is attached; the firmware menu cannot flash until one is connected.
-
-The device menu can include a GPS receiver. Check `ls -l /dev/serial/by-id/` on the Pi;
-port numbers can change. With multiple responding radios, select one explicitly using
-`-e meshtastic_device=/dev/serial/by-id/your-radio` on the startup command.
-
-Both `localhost/meshtastic:latest` and `localhost/meshflash:latest` must be built or
-loaded locally. The installer calls `build_pods.sh`, which requires both build folders.
-The flasher bundles firmware while online; no internet is needed for bundled releases.
-See the [Meshtastic README](../setup_library/files/containers/meshtastic/README.md) and
-[meshflash README](../setup_library/files/containers/meshflash/README.md) for device
-mappings, supported firmware, SSH access, and upgrades from older images.
-
-## Adding map content (tiles + routing)
-
-The **Maps → OpenStreetMap** viewer has two independent kinds of data, both stored on the USB under
-`/Library/maps`:
-
-| Data | Path on the USB | Purpose |
-|------|-----------------|---------|
-| **PMTiles** | `/Library/maps/pmtiles/<state>_2025-12.pmtiles` | The map you see and pan/zoom |
-| **OSM extract** | `/Library/maps/osm/region.osm.pbf` | Routing data for driving directions |
-
-The viewer auto-discovers any `.pmtiles` files. Driving directions only work when a
-routing extract named `region.osm.pbf` is present, and routes only within the area that
-extract covers.
-
-The easiest way to load both is the helper script in the `library_maps` container folder,
-which downloads a state's tiles **and** its routing extract and activates it for routing:
+Optional Wi-Fi hotspot (run from a console or Ethernet connection):
 
 ```bash
-cd /root/install/setup_library/files/containers/library_maps
-# download Georgia's map tiles + routing data, and make it the active route region:
-./scripts/get-state.sh georgia
+nmcli device status
+sudo ./bootstrap --hotspot-interface wlp2s0 --hotspot-password 'choose-a-password'
 ```
 
-You can load several states' tiles for viewing and choose which one routes:
+Use the actual Wi-Fi interface name. The adapter must support AP mode.
+NetworkManager creates the `library-hotspot` connection, SSID `library`, WPA
+password you provide, and address `10.1.1.1/24`, with shared DHCP/DNS. Selecting
+an adapter replaces its active client connection with the hotspot; the same
+adapter is not used as an internet client at the same time. Other connections
+are preserved. Ensure `10.1.1.0/24` is not already used by your LAN or VPN.
+
+To stop broadcasting and resume normal Wi-Fi use:
 
 ```bash
-./scripts/get-state.sh georgia florida        # tiles + pbf for both
-./scripts/get-state.sh --route georgia         # pick georgia as the routing region
+sudo nmcli connection modify library-hotspot connection.autoconnect no
+sudo nmcli connection down library-hotspot
 ```
 
-After changing the routing extract, restart the routing engine so it rebuilds its graph
-(the startup playbook also does this automatically on the next boot):
+Connect to your normal Wi-Fi profile through Debian afterward. Hotspot hardware
+support must be checked on the actual laptop/desktop; an Ethernet-only VM
+cannot validate radio behavior.
+
+## HDMI
+
+Use Debian's normal HDMI desktop and browser, opening `http://localhost`.
+During installation Firefox opens a local HTML progress page on the logged-in
+desktop. It refreshes every 15 seconds through to success or failure:
+`file:///root/progress.html`. A minimal/headless Debian
+install remains a console unless you install a Debian desktop yourself. This installer does not replace the display manager,
+create a `pi` user, enable desktop autologin, or configure a kiosk.
+Pi TFT, touchscreen, GPIO, SPI overlays and framebuffer splash services are
+excluded from the x86 installation path.
+
+## Images and rebuilds
+
+`rasbase_parts` and the bundled ARM Kiwix archive are inherited files; the x86
+build does not use them. The shared base is freshly built from the official
+Debian Trixie slim image and checked for Debian, Trixie, and amd64 before use.
+To refresh it and rebuild the applications:
 
 ```bash
-podman restart graphhopper
+cd /path/to/Library-Creator_x86
+sudo bash setup_library/files/containers/update_rasbase.sh
+sudo ./bootstrap
 ```
 
-> ⚠️ **Raspberry Pi memory limit.** Building the routing graph is memory-intensive. On a
-> **2 GB Pi, use single-state extracts only** - a multi-state or regional `.pbf` (over
-> ~1.5 GB) will run out of memory while importing and routing will never come up. Map
-> **viewing** (PMTiles) is unaffected and works at any size. `get-state.sh` warns you if
-> an extract looks too large.
+`build_pods.sh` also prepares/verifies the base before building applications.
+The local base tag stays `localhost/rasbase_master:latest` for compatibility
+with the existing Containerfiles. Native amd64 builds are required.
 
----
+Office is built and retained as `localhost/craft_apps:dontrun` when declined.
+Use `sudo ./bootstrap --office yes` or `--office no` to change the remembered
+choice. Existing images are not force-removed before rebuilding. The Reinstall / Upgrade menu explicitly runs `git pull --ff-only` before
+rebuilding. Rebuild Containers uses current source without Git. Neither action
+performs global Podman cleanup. Configure Office enables/disables the installed
+image without rebuilding; use `--configure-office yes|no` for its CLI equivalent.
 
-## Checking progress and logs
+## Services and ports
 
-- **Status screen:** `./bootstrap` → `4) System Status`
-- **Auto-install log:** `/root/install.log`
-- **Ansible playbook log:** `/root/installplay.log`
+| Service | Host port |
+| --- | --- |
+| Library | 80 |
+| Downloads | 4826 |
+| Kiwix | 6902 |
+| Maps | 8080 |
+| E-books | 8083 |
+| LMS music | 9099 (also linked through Library) |
+| Music player | 2001 |
+| Meshtastic / firmware setup | 8086 |
+| StreetZim | 8093 |
+| Office, when enabled | 3001 HTTPS |
+| Host shutdown/restart page | 9999 |
 
-View a log with:
+Services bind to host interfaces for LAN use. Content-dependent services start
+when their content exists. Configure any host firewall or VM port forwarding
+for the services you intend to access. The service containers retain fixed
+addresses on Podman's `10.88.0.0/16` bridge; the installer refuses an incompatible
+existing `podman` bridge instead of replacing another workload's network.
 
 ```bash
-less /root/installplay.log
+sudo systemctl status start_library
+sudo journalctl -u start_library -b
+sudo podman ps -a
+sudo podman logs data_download
+sudo systemctl restart start_library
 ```
 
----
-
-## Reinstalling or upgrading
-
-Run `/root/Library-Creator/bootstrap` and choose **`2) Reinstall / Upgrade`**.
-After you confirm, this:
-
-- Runs `git -C /root/Library-Creator pull --ff-only` to update the current branch
-  from its configured upstream
-- Clears the boot-stage flags (`.0boot`, `.firstboot`, `.secondboot`, `.thirdboot`)
-- Removes `/root/install`, `/root/display`, and `/root/start_library`
-- Stops all Podman containers
-- Removes all Podman container images
-
-The Git update needs internet. If the checkout is missing or the pull fails,
-cleanup does not start. Resolve the reported Git or connection error and retry;
-the installer does not discard local changes or force a merge.
-
-After cleanup finishes, the installer exits. Run
-`/root/Library-Creator/bootstrap` again and choose **`1) Fresh Install`** to use
-the updated installer and rebuild the installation. Reinstall cleanup does not
-delete USB content; the normal Fresh Install formatting rules still apply to
-drives without the `Library_USB` label.
-
-To restart an interrupted install, choose **`3) Restart Install`**. Select the
-display and confirm: the installer clears `.0boot`, `.firstboot`, `.secondboot`
-and `.thirdboot`, then runs a fresh installation from First Boot. The same USB
-formatting rules apply as for **`1) Fresh Install`**.
-
----
-
-## Troubleshooting
-
-### Startup: the main QR-code page does not appear
-
-If the Library's main QR-code page does not appear after startup, connect to the
-Pi over SSH using your account and the Pi's IP address, then become root:
-
-```bash
-ssh your-user@your-pi-ip
-sudo -i
-```
-
-Replace `your-user` and `your-pi-ip` with your SSH username and the Pi's IP address.
-View the Library startup service logs to find where startup stopped or failed:
-
-```bash
-journalctl -u start_library
-```
-
-If the boot process is still running, follow the logs as new messages arrive:
-
-```bash
-journalctl -u start_library -f
-```
-
-Press **q** to leave the log viewer, or **Ctrl+C** to stop following live logs.
-This only closes the log view; it does not stop the Library startup process.
-
-### Other installation issues
-
-**The installer didn't resume after a reboot.**
-Check that the resume cron entry exists:
-
-```bash
-cat /var/spool/cron/crontabs/root
-```
-
-It should contain a line calling `/root/bootstrap --auto`. If the system has been up
-longer than 5 minutes, auto-resume won't fire. Run `./bootstrap` and pick
-`3) Restart Install` to install again from scratch.
-
-**The Ansible stage failed.**
-Read `less /root/installplay.log` to find the failing task. Then use
-`3) Restart Install` after fixing the underlying problem.
-
-**Port 8086 shows firmware setup even though a radio is connected.**
-The radio did not complete a Meshtastic handshake. Check its USB cable, firmware,
-and whether another serial client has the port open. A recognized ESP chip or USB
-adapter is not proof that Meshtastic is running. The bridge never installs firmware
-automatically. See the radio READMEs linked above.
-
-**The USB storage wasn't detected.**
-The device must be labeled `Library_USB` and formatted exFAT. A fresh install handles
-this for you; if you're mounting an existing drive, confirm the label with
-`lsblk -o NAME,FSTYPE,LABEL`.
-
-**The display shows nothing / wrong colors.**
-Confirm you picked the correct display type during install. To change it, choose
-`3) Restart Install` and select the correct display. Serial consoles may not render the
-color status messages properly - use SSH or a real terminal.
-
-**I can't see the `library` WiFi network.**
-The hotspot needs full control of `wlan0`. If something else (like NetworkManager)
-is holding the interface, the hotspot container can't start. See the hotspot notes in
-[DEVELOPERS.md](DEVELOPERS.md).
-
-For a deeper reference on every menu option, boot stage, and file location, see
-[`bootstrap.md`](../bootstrap.md) in the repository root.
-
-## Add offline collections after installation
-
-For music, use **Downloads → Upload files → Music files**. Both players read
-`/Library/music`. Open **Music → Music library (LMS)** and run its scanner, or
-**Music → iPod-style player** and press **Rescan music folder**. The iPod-style
-player uses port 2001 and needs no LMS database. See the
-[music player guide](../setup_library/files/containers/music_player/README.md)
-for adding it to an existing appliance, and the [Usage Guide](USAGE.md#using-the-music-player)
-for playback controls.
-
-Open **Downloads → ZIM Library** to browse Kiwix collections with readable
-titles, descriptions, sizes, and language filters. English is selected by
-default. Choose **Maps (ZIM)** in the Collection filter for offline map archives,
-or browse Wikipedia, books, travel guides, and other available collections.
-Download selected files, then restart the Library to make them available in
-its **Wikipedia / Kiwix** reader.
-
-For regional StreetZim archives, choose **Downloads → StreetZim maps**. Completed
-files save to the same `/Library/wiki` folder on the USB. Restart StreetZim or
-the Library, then choose **Maps → StreetZim** on the homepage. The Maps menu
-also offers **OpenStreetMap**, which uses PMTiles from **Downloads → OpenStreetMap
-tiles** and GraphHopper data from **Downloads → Routing**.
-
-With the updated images and startup playbook, StreetZim owns the auto-detected
-USB GPS and both map viewers share its position. OpenStreetMap can be stopped
-without interrupting StreetZim's GPS. See the
-[StreetZim integration instructions](../setup_library/files/containers/street_zim/README.md#install-the-integrated-maps-menu-and-startup)
-for upgrading an existing appliance.
-
-See the [downloader guide](../setup_library/files/containers/data_download/README.md#browse-the-zim-library)
-for browsing and updating the downloader on an existing installation.
-
-## Optional browser office apps
-
-Fresh Install and Restart Install ask whether to enable **Office** (WordCraft,
-DeckCraft, and GridCraft). It requires **a keyboard and a pointing device
-(mouse, touchscreen, or trackpad)** on the browser device. The default is No.
-The image is built either way: Yes retains `localhost/craft_apps:latest`; No
-retains `localhost/craft_apps:dontrun` and removes the `:latest` alias.
-`start_library.yml` skips Office when `:dontrun` exists, even if `:latest` also
-exists. Disabled Office does not appear in the generated homepage navigation.
-
-Enabled Office opens at **https://library:3001**, using a self-signed certificate.
-Only HTTPS is published. Startup creates `/Library/documents` if missing and
-mounts it at `/documents`; settings use the `craft-apps-config` volume on native
-storage, including when the content drive is exFAT.
-
-For an existing installation, build/load the `craft_apps` image, deploy the
-updated startup playbook, and rebuild the webserver image. Use bootstrap →
-**6) Configure Office** (or `--configure-office`) to change the choice without
-reinstalling, then restart the Library. Save open documents first. See the
-[Library Office guide](../setup_library/files/containers/craft_apps/README.md)
-for build commands, tag handling, and deployment details.
+Shutdown and restart controls affect the whole host, including a PC or VM.
+Use this stack on a trusted local network.

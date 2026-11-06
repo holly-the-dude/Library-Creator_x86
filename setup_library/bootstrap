@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+# Debian PC/VM installation. No disk partitioning, OS upgrade or Pi boot stages.
+set -euo pipefail
+
+SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+
+usage() {
+    cat <<'EOF'
+Library for Debian 13 (Trixie), amd64
+  sudo ./bootstrap [--storage directory|mounted] [--office yes|no]
+                   [--hotspot-interface DEVICE --hotspot-password PASSWORD]
+  ./bootstrap --check
+
+Content lives at /Library. Directory mode uses the existing filesystem;
+mounted mode requires an existing mount at /Library (a symlink is supported)
+and records its UUID mount in /etc/fstab for boot. Disks are never formatted.
+Options are remembered across installs. Ethernet and Wi-Fi stay as configured
+by Debian. A hotspot is optional and uses the explicitly selected Wi-Fi device.
+Use Debian's normal HDMI desktop/console; no Pi display drivers are installed.
+EOF
+}
+
+preflight() {
+    local ID='' VERSION_CODENAME=''
+    . /etc/os-release
+    if [[ "$ID" != debian || "$VERSION_CODENAME" != trixie || "$(uname -m)" != x86_64 ]]; then
+        echo 'This installer requires Debian 13 (trixie) amd64 on a PC or VM.' >&2
+        return 1
+    fi
+    [[ -d /run/systemd/system ]] || { echo 'A booted systemd host is required.' >&2; return 1; }
+    [[ -f "$SOURCE_DIR/setup_library/files/start_library.yml" ]] || return 1
+    echo 'Debian Trixie amd64 preflight passed.'
+}
+
+main() {
+    local storage='' office='' wifi='' password='' check=no
+    while (($#)); do
+        case "$1" in
+            --help|-h) usage; return 0 ;;
+            --check) check=yes; shift ;;
+            --storage|--office|--hotspot-interface|--hotspot-password)
+                [[ $# -ge 2 && -n "$2" ]] || { usage >&2; return 2; }
+                case "$1" in
+                    --storage) storage=$2 ;;
+                    --office) office=$2 ;;
+                    --hotspot-interface) wifi=$2 ;;
+                    --hotspot-password) password=$2 ;;
+                esac
+                shift 2 ;;
+            *) usage >&2; return 2 ;;
+        esac
+    done
+    case "$storage" in ''|directory|mounted) ;; *) echo 'Invalid storage mode.' >&2; return 2 ;; esac
+    case "$office" in ''|yes|no) ;; *) echo 'Office must be yes or no.' >&2; return 2 ;; esac
+    if [[ -n "$wifi$password" ]]; then
+        [[ -n "$wifi" && ${#password} -ge 8 && ${#password} -le 63 ]] || {
+            echo 'Hotspot needs an interface and an 8–63 character WPA password.' >&2; return 2;
+        }
+    fi
+    preflight
+    [[ "$check" == yes ]] && return 0
+    [[ $EUID == 0 ]] || { echo 'Run the installation with sudo.' >&2; return 1; }
+    # Serialize installs without removing any containers or images.
+    exec 9>/run/lock/library-install.lock
+    flock -n 9 || { echo 'Another Library installation is running.' >&2; return 1; }
+    if [[ -f /etc/library/config.json ]]; then
+        [[ -n "$storage" ]] || storage=$(python3 -c 'import json; print(json.load(open("/etc/library/config.json"))["library_storage_mode"])')
+        [[ -n "$office" ]] || office=$(python3 -c 'import json; print(json.load(open("/etc/library/config.json"))["library_office"])')
+    fi
+    if [[ -z "$storage" ]]; then
+        if mountpoint -q /Library; then storage=mounted; else storage=directory; fi
+    fi
+    office=${office:-no}
+    if [[ "$storage" == mounted ]]; then
+        mountpoint -q /Library || { echo 'Mount your content disk at /Library first.' >&2; return 1; }
+    fi
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y podman ansible python3-jmespath python3-flask rsync curl jq \
+        ca-certificates util-linux exfatprogs
+    # Stage only this checkout. Neither the Pi repository nor its ARM archives
+    # are used, even when the checkout was launched from another directory.
+    install -d -m 0755 /opt/library-creator /etc/library
+    # Preserve a user-supplied /Library symlink and its filesystem permissions.
+    [[ -d /Library ]] || mkdir -p /Library
+    if [[ "$SOURCE_DIR" != /opt/library-creator ]]; then
+        rsync -a --exclude=.git --exclude=rasbase_parts --exclude=__pycache__ \
+            "$SOURCE_DIR/" /opt/library-creator/
+    fi
+    export LIBRARY_OFFICE="$office"
+    bash /opt/library-creator/setup_library/files/containers/build_pods.sh
+    # Publish configuration only after all required images built successfully.
+    python3 - "$storage" "$office" <<'PY'
+import json, os, sys
+from pathlib import Path
+p = Path('/etc/library/config.json')
+temporary = p.with_suffix('.tmp')
+temporary.write_text(json.dumps({'library_storage_mode': sys.argv[1],
+                                'library_office': sys.argv[2],
+                                'library_storage_path': str(Path('/Library').resolve())}, indent=2) + '\n')
+os.replace(temporary, p)
+PY
+    if [[ -n "$wifi" ]]; then
+        apt-get install -y network-manager dnsmasq-base
+        systemctl enable --now NetworkManager
+        bash /opt/library-creator/setup_library/configure_hotspot.sh "$wifi" "$password"
+    fi
+    ansible-playbook -i localhost, -c local /opt/library-creator/setup_library/install_x86.yml
+    echo 'Library installed. Open http://localhost or http://<this-machine-IP> from your browser.'
+    echo 'HDMI uses the existing Debian desktop/console. No reboot is required.'
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi

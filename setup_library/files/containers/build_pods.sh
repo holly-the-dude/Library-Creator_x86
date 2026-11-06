@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
 # build_pods.sh
-# Iterates over each subfolder that contains a Containerfile, removes the
-# existing image (podman rmi --force), then rebuilds localhost/<folder>:latest.
+# Builds the native base first, then each application Containerfile. Existing
+# images remain available until a replacement build succeeds.
 # Use Docker image format with Podman to preserve Containerfile HEALTHCHECKs.
 # Meshtastic and meshflash are both required by start_library.yml.
 #
@@ -25,6 +25,15 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR" || exit 1
 
+# Every dependent build starts with a verified native base.
+build_options=(--platform linux/amd64 --format docker)
+if [[ "${LIBRARY_REBUILD:-no}" == yes ]]; then
+    bash "$SCRIPT_DIR/rasbase/build_rasbase.sh" --refresh || exit $?
+    build_options+=(--no-cache)
+else
+    bash "$SCRIPT_DIR/rasbase/build_rasbase.sh" || exit $?
+fi
+
 # Startup needs the radio bridge AND the firmware setup fallback. Fail before
 # removing images if either build context is missing from this checkout.
 for required in meshtastic meshflash; do
@@ -42,6 +51,8 @@ echo
 
 for dir in */; do
     name="${dir%/}"
+    # Host NetworkManager provides the optional PC hotspot.
+    [[ "$name" == hotspot ]] && continue
     tag="localhost/${name}:latest"
 
     # Only process folders that have a Containerfile (or Dockerfile).
@@ -52,6 +63,8 @@ for dir in */; do
     else
         continue
     fi
+
+    echo "[STEP] Building ${name}"
 
     echo "${BOLD}${CYAN}────────────────────────────────────────────${RESET}"
     echo "${BOLD}${CYAN}📦 Container: ${name}${RESET}"
@@ -71,7 +84,7 @@ for dir in */; do
             fi
         fi
         case "$office_choice" in yes|no) ;; *) echo 'LIBRARY_OFFICE must be yes or no.' >&2; exit 1 ;; esac
-        if podman build --format docker -t "$tag" -f "${dir}${containerfile}" "$dir" &&
+        if podman build "${build_options[@]}" -t "$tag" -f "${dir}${containerfile}" "$dir" &&
                 bash "${dir}set-enabled.sh" "$office_choice"; then
             if [[ "$office_choice" == no ]]; then tag=localhost/craft_apps:dontrun; fi
             built+=("$tag")
@@ -81,17 +94,9 @@ for dir in */; do
         continue
     fi
 
-    # Remove existing image (ignore errors if it doesn't exist).
-    echo "${YELLOW}➜ Removing existing image '${tag}'...${RESET}"
-    if podman rmi --force "${tag}" >/dev/null 2>&1; then
-        echo "${GREEN}  ✓ Removed existing image${RESET}"
-    else
-        echo "${BLUE}  • No existing image to remove${RESET}"
-    fi
-
     # Build the container.
     echo "${YELLOW}➜ Building '${tag}'...${RESET}"
-    if podman build --format docker -t "${tag}" -f "${dir}${containerfile}" "${dir}"; then
+    if podman build "${build_options[@]}" -t "${tag}" -f "${dir}${containerfile}" "${dir}"; then
         echo "${GREEN}  ✓ Successfully built '${tag}'${RESET}"
         built+=("${tag}")
     else
@@ -111,15 +116,15 @@ for ghfile in */graphhopper/Containerfile; do
     ghdir="$(dirname "$ghfile")"                # e.g. library_maps/graphhopper
     parent="$(basename "$(dirname "$ghdir")")"  # e.g. library_maps
     tag="${parent}-graphhopper:11"
+    echo "[STEP] Building ${tag}"
 
     echo "${BOLD}${CYAN}────────────────────────────────────────────${RESET}"
     echo "${BOLD}${CYAN}📦 Routing subimage: ${tag} (from ${ghdir})${RESET}"
     echo "${BOLD}${CYAN}────────────────────────────────────────────${RESET}"
 
-    podman rmi --force "${tag}" >/dev/null 2>&1 || true
 
     echo "${YELLOW}➜ Building '${tag}'...${RESET}"
-    if podman build --format docker -t "${tag}" -f "${ghdir}/Containerfile" "${ghdir}"; then
+    if podman build "${build_options[@]}" -t "${tag}" -f "${ghdir}/Containerfile" "${ghdir}"; then
         echo "${GREEN}  ✓ Successfully built '${tag}'${RESET}"
         built+=("${tag}")
     else

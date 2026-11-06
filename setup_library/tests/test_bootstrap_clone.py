@@ -16,7 +16,8 @@ class CloneSetupTests(unittest.TestCase):
     def run_setup(self, missing_file=None, **settings):
         function = re.search(r'^install_clone_service\(\) \{\n.*?^\}',
                              BOOTSTRAP.read_text(), re.M | re.S).group()
-        function = function.replace('ansible=/root/.local/bin/ansible-playbook', 'ansible="$TEST_ANSIBLE"')
+        function = function.replace('ansible=/usr/bin/ansible-playbook', 'ansible="$TEST_ANSIBLE"')
+        function = function.replace('local repository="$SOURCE_DIR"', 'local repository="$TEST_REPOSITORY"')
         stubs = r'''
 trace() { printf 'CALL'; printf '\t%s' "$@"; printf '\n'; }
 msg_error() { printf 'ERROR:%s\n' "$1"; }
@@ -42,7 +43,7 @@ install() { trace install "$@"; return "$COPY_STATUS"; }
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             repository = root / 'source with spaces'
-            for relative in ('setup_library/01_install_ansible.yml', 'setup_library/files/start_library.yml',
+            for relative in ('setup_library/install_clone.yml', 'setup_library/files/start_library.yml',
                              'setup_library/files/library-clone.socket', 'setup_library/files/library-clone.service',
                              'setup_library/files/containers/data_download/clone_host.py'):
                 if relative == missing_file:
@@ -77,7 +78,7 @@ exit "$RECREATE_STATUS"
         self.assertEqual(calls, [
             ['podman', 'image', 'exists', 'localhost/data_download:latest'],
             ['mountpoint', '-q', '/Library'], ['idle', '1'],
-            ['ansible', 'SOURCE/setup_library/01_install_ansible.yml', '--tags', 'clone_service', '-i', 'localhost,', '-c', 'local'],
+            ['ansible', 'SOURCE/setup_library/install_clone.yml', '--tags', 'clone_service', '-i', 'localhost,', '-c', 'local'],
             ['idle', '2'], ['systemctl', 'try-restart', 'library-clone.service'],
             ['systemctl', 'is-active', '--quiet', 'library-clone.socket'],
             ['install', '-m', '0755', 'SOURCE/setup_library/files/start_library.yml', '/root/start_library.yml'],

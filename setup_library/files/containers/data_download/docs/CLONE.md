@@ -1,3 +1,9 @@
+> **Debian x86 edition:** Fresh installs enable USB-content cloning. Use the
+> **Install / Repair Clone** menu or `bootstrap --install-clone` for targeted
+> repair. The service accepts USB content clones only; BIOS/UEFI OS cloning is
+> unsupported. The Pi SD/boot-stage instructions below describe the original
+> implementation and do not apply to x86 OS disks.
+
 # Clone the SD card or Library_USB
 
 Open **Downloads → Clone**. Choose **SD card (bootable system)** or

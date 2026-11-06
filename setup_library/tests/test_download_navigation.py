@@ -37,7 +37,7 @@ class DownloadNavigationTests(unittest.TestCase):
         self.assertLess(html.index(">Meshtastic</a>"), html.index(">Downloads</a>"))
         self.assertLess(html.index(">Downloads</a>"), html.index(">Shutdown</a>"))
         self.assertIn('href="/services/4826/"', html)
-        get.assert_any_call("http://10.1.1.1:4826/api/health", timeout=5)
+        get.assert_any_call("http://10.88.0.215:4286/api/health", timeout=5)
 
     def test_unavailable_downloader_is_omitted(self):
         with patch.object(web.requests, "get", side_effect=requests.ConnectionError):

@@ -91,9 +91,8 @@ services:
 
   - name: meshtastic
     display_name: Meshtastic
-    # Probe the Pi's published port: both the bridge and firmware setup
-    # terminal use port 8086 and are mutually exclusive.
-    internal_ip: 10.1.1.1
+    # Both radio services share this bridge address and are mutually exclusive.
+    internal_ip: 10.88.0.214
     internal_port: 8086
     external_port: 8086
     check_path: /
@@ -102,8 +101,8 @@ services:
 
   - name: data_download
     display_name: Downloads
-    internal_ip: 10.1.1.1
-    internal_port: 4826
+    internal_ip: 10.88.0.215
+    internal_port: 4286
     external_port: 4826
     # Local health stays available while the downloader waits for internet.
     check_path: /api/health

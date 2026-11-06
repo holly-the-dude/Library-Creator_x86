@@ -1,0 +1,27 @@
+---
+- name: Install host cloning dependencies
+  ansible.builtin.apt:
+    name: [python3, rsync, util-linux, fdisk, udev, dosfstools, e2fsprogs, exfatprogs]
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install host USB clone handler
+  ansible.builtin.copy:
+    src: files/containers/data_download/clone_host.py
+    dest: /usr/local/bin/library_clone.py
+    mode: '0755'
+
+- name: Install clone socket and service
+  ansible.builtin.copy:
+    src: "files/{{ item }}"
+    dest: "/etc/systemd/system/{{ item }}"
+    mode: '0644'
+  loop: [library-clone.socket, library-clone.service]
+
+- name: Enable host clone requests
+  ansible.builtin.systemd_service:
+    name: library-clone.socket
+    enabled: true
+    daemon_reload: true
+    state: started

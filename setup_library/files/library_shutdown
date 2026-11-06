@@ -1,0 +1,4 @@
+#!/bin/bash
+set -euo pipefail
+/usr/bin/podman stop --all --time 30
+/usr/sbin/shutdown -P now

@@ -1,0 +1,8 @@
+FROM docker.io/library/debian:trixie-slim
+
+RUN export DEBIAN_FRONTEND=noninteractive && \
+    test "$(dpkg --print-architecture)" = amd64 && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+CMD ["/bin/bash"]

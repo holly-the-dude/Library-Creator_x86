@@ -52,6 +52,10 @@ class OfficeFixture(unittest.TestCase):
             self.env.pop(key, None)
         for app in ['craft_apps', 'meshtastic', 'meshflash']:
             (self.root/app).mkdir(); (self.root/app/'Containerfile').touch()
+        # This fixture tests Office transitions. Base-build behavior has its
+        # own tests; provide a successful prerequisite here.
+        (self.root/'rasbase').mkdir()
+        (self.root/'rasbase/build_rasbase.sh').write_text('#!/bin/bash\nexit 0\n')
         helper = (CONTAINERS/'craft_apps/set-enabled.sh').read_text()
         # All Podman calls are mocked; bypass only the privilege guard in this fixture.
         (self.root/'craft_apps/set-enabled.sh').write_text(helper.replace('$EUID', '0'))
@@ -122,18 +126,6 @@ class OfficeTagTests(OfficeFixture):
         self.images({DISABLED:'old', 'meshflash':'other', 'meshtastic':'other'})
         s=self.run_script('create_tar_pods.sh')
         self.assertIn(['save','-o','craft_apps.tar',DISABLED],s['calls'])
-
-    def test_prompt_requires_yes_and_explains_input_devices(self):
-        source=(ROOT/'bootstrap').read_text()
-        functions='\n'.join(re.search(r'^'+name+r'\(\) \{\n.*?^\}',source,re.M|re.S).group()
-                            for name in ['confirm','prompt_office_addon'])
-        for answer,expected in [('yes','yes'),('y','yes'),('no','no'),('','no')]:
-            result=subprocess.run(['bash','-c','msg_info() { echo "$1"; };\n'+functions+
-                                   '\nprompt_office_addon\necho "CHOICE=$LIBRARY_OFFICE"'],
-                                  input=answer+'\n',capture_output=True,text=True,timeout=5)
-            self.assertEqual(result.returncode,0,result.stderr)
-            self.assertIn('CHOICE='+expected,result.stdout)
-            self.assertIn('keyboard AND a pointing device',result.stdout)
 
 @unittest.skipUnless(shutil.which('ansible-playbook'), 'Ansible is required')
 class OfficeStartupTests(OfficeFixture):

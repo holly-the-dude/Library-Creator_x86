@@ -1,0 +1,10 @@
+---
+- name: Install or repair Library USB cloning
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Install USB clone support
+      ansible.builtin.import_tasks: clone_tasks.yml
+      tags: [clone_service]

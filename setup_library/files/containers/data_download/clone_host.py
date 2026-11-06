@@ -175,6 +175,8 @@ def validate_boot_source(root, boot):
 
 
 def source_info(kind, disks):
+    if kind != 'usb' and os.environ.get('LIBRARY_CLONE_USB_ONLY') == '1':
+        raise ValueError('This x86 installation supports Library USB content cloning only; BIOS/UEFI OS cloning is not supported.')
     root_disk, root = mounted_device('/', disks)
     lib_disk, lib = mounted_device('/Library', disks)
     protected = {root_disk['name'], lib_disk['name']}
@@ -213,9 +215,12 @@ def inspect(kind):
             raise ValueError(f'Host clone dependency missing: {tool}')
     disks = inventory()
     info, protected = source_info(kind, disks)
-    # Always protect boot too, including when cloning the USB drive.
-    boot_disk, _ = mounted_device('/boot/firmware', disks)
-    protected.add(boot_disk['name'])
+    # Debian PCs may have /boot/efi, a separate /boot, or no separate boot
+    # mount at all. The Pi /boot/firmware path is not a PC prerequisite.
+    for path in ('/boot', '/boot/efi', '/boot/firmware'):
+        if os.path.ismount(path):
+            boot_disk, _ = mounted_device(path, disks)
+            protected.add(boot_disk['name'])
     targets = []
     for disk in disks:
         if target_ok(disk, protected, kind):

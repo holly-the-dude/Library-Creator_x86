@@ -135,7 +135,7 @@ class ProgressTests(unittest.TestCase):
         self.assertEqual(state['status'], 'failed')
         self.assertIn('Building wiki', state['stage'])
         self.assertIn('&lt;script&gt;', page)
-        self.assertNotIn('<script>', page)
+        self.assertNotIn('<script>bad()</script>', page)
         self.assertNotIn('Library is ready', page)
 
     def test_missing_worker_updates_failure_instead_of_staying_running(self):

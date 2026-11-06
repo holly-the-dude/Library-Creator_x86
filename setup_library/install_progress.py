@@ -33,7 +33,7 @@ def publish(directory, status, stage, output, code=None, operation='installation
     title = {'running': f'Library {operation} in progress',
              'complete': 'Library is ready' if operation == 'installation' else f'Library {operation} complete',
              'failed': f'Library {operation} stopped'}[status]
-    safe = html.escape(ANSI.sub('', output)[-16000:])
+    safe = html.escape('\n'.join(ANSI.sub('', output).splitlines()[-30:]))
     final = ('<p><a href="http://localhost">Open your Library</a></p>' if status == 'complete' and operation != 'USB formatting'
              else '<p>The USB partition is ready. Return to the terminal menu to install Library.</p>' if status == 'complete'
              else '<p>Read the error below, correct it, and choose Restart Install.</p>' if status == 'failed'
@@ -47,11 +47,20 @@ def publish(directory, status, stage, output, code=None, operation='installation
 main{{max-width:1100px;margin:4vh auto;padding:24px}}h1{{font-size:2.4rem}}
 .stage{{padding:18px;background:#21334d;border-left:5px solid #55b9ef}}
 pre{{font:14px monospace;white-space:pre-wrap;overflow-wrap:anywhere;padding:20px;
+max-height:45vh;overflow:auto;
 background:#09121e;border-radius:8px}}a{{display:inline-block;padding:12px 22px;
 background:#91e3bd;color:#08291b;border-radius:6px}}small{{color:#adbed5}}</style></head>
 <body><main><h1>{html.escape(title)}</h1><p class="stage">{html.escape(stage)}</p>{final}
-<small>Refreshes every 15 seconds · Updated {now} · Full log: /var/log/library-installer/install.log</small>
-<pre>{safe}</pre></main></body></html>''')
+<small>Last 30 lines · Refreshes every 15 seconds · Updated {now}<br>
+Full output: installer terminal and /var/log/library-installer/install.log</small>
+<pre>{safe}</pre></main>
+<script>
+window.addEventListener('pageshow', () => requestAnimationFrame(() => {{
+    window.scrollTo(0, 0);
+    const output = document.querySelector('pre');
+    output.scrollTop = output.scrollHeight;
+}}));
+</script></body></html>''')
 
 
 def launch_browser(page):

@@ -172,6 +172,9 @@ non-root graphical session on a local progress file. No framebuffer or
 The page is `file:///root/progress.html`. It reloads every
 **15 seconds**, showing the current stage and recent output throughout package
 installation, USB preparation, each container build and service startup. The
+output panel shows only the latest **30 lines** and scrolls to its bottom on
+each reload while the page stays at the top with the stage heading visible.
+The terminal and saved log retain the full output. The
 final success screen links to `http://localhost`; a failure or cancellation
 stays on a failure screen with the stage and error output instead of claiming
 success. The same page reports Office, Clone and formatting operations.

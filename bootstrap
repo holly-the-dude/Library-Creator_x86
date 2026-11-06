@@ -4,6 +4,14 @@ set -euo pipefail
 
 SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 
+# Keep the Pi bootstrap palette, including worker output captured for Firefox.
+RED='' GREEN='' YELLOW='' BLUE='' MAGENTA='' CYAN='' WHITE='' BOLD='' NC=''
+if [[ ( -t 1 || -t 0 ) && "${TERM:-dumb}" != dumb && -z "${NO_COLOR:-}" ]]; then
+    RED=$'\033[0;31m' GREEN=$'\033[0;32m' YELLOW=$'\033[1;33m'
+    BLUE=$'\033[0;34m' MAGENTA=$'\033[0;35m' CYAN=$'\033[0;36m'
+    WHITE=$'\033[1;37m' BOLD=$'\033[1m' NC=$'\033[0m'
+fi
+
 usage() {
     cat <<'EOF'
 Library installer — Debian Trixie amd64
@@ -40,37 +48,49 @@ preflight() {
 }
 
 
-msg_info() { printf '[INFO] %s\n' "$*"; }
-msg_ok() { printf '[OK] %s\n' "$*"; }
-msg_warn() { printf '[WARN] %s\n' "$*"; }
-msg_error() { printf '[FAIL] %s\n' "$*" >&2; }
-msg_step() { printf '[STEP] %s\n' "$*"; }
+msg_info() { printf '%s[INFO]%s %s\n' "$BLUE" "$NC" "$*"; }
+msg_ok() { printf '%s[OK]%s %s\n' "$GREEN" "$NC" "$*"; }
+msg_warn() { printf '%s[WARN]%s %s\n' "$YELLOW" "$NC" "$*"; }
+msg_error() { printf '%s[FAIL]%s %s\n' "$RED" "$NC" "$*" >&2; }
+msg_step() { printf '%s[STEP]%s %s%s%s\n' "$MAGENTA" "$NC" "$BOLD" "$*" "$NC"; }
 confirm() {
     local answer
-    read -r -p "${1:-Continue?} [y/yes/N]: " answer || return 1
+    read -r -p "${YELLOW}${1:-Continue?} [y/yes/N]: ${NC}" answer || return 1
     [[ "$answer" =~ ^[Yy]([Ee][Ss])?$ ]]
 }
 
 banner() {
-    printf '\n============================================================\n'
-    printf '                Library Bootstrap Installer\n'
-    printf '                Debian Trixie x86-64 Edition\n'
-    printf '============================================================\n'
+    printf '%s╔══════════════════════════════════════════════════╗%s\n' "$CYAN" "$NC"
+    printf '%s║%s       Library Bootstrap Installer                %s║%s\n' "$CYAN" "$WHITE" "$CYAN" "$NC"
+    printf '%s║%s       Debian Trixie x86-64 Edition                %s║%s\n' "$CYAN" "$YELLOW" "$CYAN" "$NC"
+    printf '%s╚══════════════════════════════════════════════════╝%s\n' "$CYAN" "$NC"
+}
+
+separator() { printf '%s──────────────────────────────────────────────────%s\n' "$CYAN" "$NC"; }
+
+pause_menu() {
+    if [[ -t 0 && -t 1 ]]; then
+        read -r -p "${CYAN}Press Enter to return to the menu...${NC}" || return 0
+    fi
 }
 
 show_main_menu() {
+    if [[ -t 1 && "${TERM:-dumb}" != dumb ]]; then
+        printf '\033[H\033[2J'
+    fi
     banner
-    cat <<'EOF'
-  1) Fresh Install          - Select USB storage and Office tools
-  2) Reinstall / Upgrade    - Git pull, then rebuild containers
-  3) Restart Install        - Retry installation from this checkout
-  4) System Status          - Progress, services, containers and storage
-  5) Install / Repair Clone - Enable USB content cloning in Downloads
-  6) Configure Office      - Enable or disable without rebuilding
-  7) Rebuild Containers    - Rebuild from current source, refresh services
-  8) Format Library USB    - Select partition, confirm erase, countdown
-  q) Quit
-EOF
+    printf '%s  Main Menu%s\n' "$WHITE" "$NC"
+    separator
+    printf '  %s1)%s Fresh Install          - Select USB storage and Office tools\n' "$GREEN" "$NC"
+    printf '  %s2)%s Reinstall / Upgrade    - Git pull, then rebuild containers\n' "$GREEN" "$NC"
+    printf '  %s3)%s Restart Install        - Retry installation from this checkout\n' "$GREEN" "$NC"
+    printf '  %s4)%s System Status          - Progress, services, containers and storage\n' "$GREEN" "$NC"
+    printf '  %s5)%s Install / Repair Clone - Enable USB content cloning in Downloads\n' "$GREEN" "$NC"
+    printf '  %s6)%s Configure Office       - Enable or disable without rebuilding\n' "$GREEN" "$NC"
+    printf '  %s7)%s Rebuild Containers     - Rebuild from current source, refresh services\n' "$GREEN" "$NC"
+    printf '  %s8)%s Format Library USB     - Select partition, confirm erase, countdown\n' "$GREEN" "$NC"
+    printf '  %sq)%s Quit\n' "$RED" "$NC"
+    separator
 }
 
 show_status() {
@@ -328,11 +348,11 @@ menu() {
     local choice
     while true; do
         show_main_menu
-        read -r -p 'Select option: ' choice || return 0
+        read -r -p "${WHITE}Select option: ${NC}" choice || return 0
         case "$choice" in
             1|3)
                 storage=''; usb=''; office=''
-                prompt_storage || continue
+                prompt_storage || { pause_menu; continue; }
                 prompt_office_addon
                 "$SOURCE_DIR/bootstrap" --install --storage "$storage" --office "$office" ${usb:+--usb-device "$usb"} || msg_error 'Installation stopped. Read the terminal/log and choose Restart Install.' ;;
             2) "$SOURCE_DIR/bootstrap" --reinstall || msg_error 'Reinstall stopped.' ;;
@@ -347,6 +367,7 @@ menu() {
             q|Q) return 0 ;;
             *) msg_warn 'Choose an option from the menu.' ;;
         esac
+        pause_menu
     done
 }
 

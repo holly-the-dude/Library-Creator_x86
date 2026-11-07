@@ -4,6 +4,69 @@ This records the scope and known regressions of the initial port against the
 original Raspberry Pi checkout. It is not a claim that the port is complete.
 The original `../Library-Creator` folder was not edited by this work.
 
+## Native ARM64 support (November 6, 2026)
+
+This checkout now accepts Debian Trixie on both amd64/x86_64 and arm64/aarch64.
+The root bootstrap, existing filenames and menu are retained. A shared
+architecture helper selects the native Podman platform; preflight also requires
+matching 64-bit Debian userspace. Unsupported CPUs and 32-bit installs fail
+before installation. Cached base images from the other architecture are rejected.
+Both platforms build a fresh Debian Trixie base; neither loads Pi archive parts.
+
+Kiwix selects x86_64 or aarch64 with separate pinned SHA-256 values. The ARM64
+checksum matches the inherited archive and was verified against the downloaded
+release during the native build. Download progress is now visible. PMTiles,
+ttyd and the Office packages already had architecture selection; their ARM64
+builds were exercised. Registry manifests for LMS and the Office webtop base
+advertised both amd64 and arm64 at validation time.
+
+Validation used an isolated rootless Podman store on the available RHEL ARM64
+development host, not an installation onto that host:
+
+- The native Debian base and all 12 application images compiled and their
+  image metadata reports `arm64`.
+- Kiwix 3.5.0 and PMTiles 1.30.2 ran natively. The Office image contains the
+  ARM64 WordCraft, DeckCraft and GridCraft packages with verified checksums.
+- The aggregate builder reported one failure after successfully compiling
+  Office: its existing enable/disable helper requires root and correctly
+  refused the rootless test. No privilege guard was removed. The installer
+  runs this helper as root; Office tag transitions passed the regression suite.
+- All 80 installer/startup tests passed on the ARM64 development host outside
+  the sandbox, using a temporary test environment for Flask. The initial
+  sandbox run could not open test sockets/Ansible RPC and lacked Flask; an
+  Office fixture also needed the new architecture helper copied into it.
+- Three Kiwix theme tests passed against the bundled ARM64 archive.
+- On libraryd (amd64), preflight, cached native-base validation, the ten
+  architecture/installer tests, twelve Office tests, and Ansible syntax checks
+  passed. A separate amd64 Kiwix image built, passed its checksum verification,
+  and ran `kiwix-serve --version`. Running Library services were not restarted.
+
+Build logs: `/tmp/library-arm64-check/build.log` on the development host and
+`/root/library-wiki-amd64-check.log` on libraryd. The full ARM64 host install,
+reboot, desktop autologin and physical peripherals still need an ARM64 Debian
+target. The successful amd64 host integration below does not establish those
+ARM64 host behaviors.
+
+## Root desktop autologin (November 6, 2026)
+
+After successful service installation, bootstrap now configures the existing
+GDM, LightDM or SDDM desktop to autologin as root, sets the requested root
+password to `library`, and installs a root desktop autostart entry. Firefox
+waits up to three minutes for `http://localhost/`, then opens the Library using
+`/root/.mozilla/firefox/library`. The existing desktop is not interrupted by
+configuration; autologin applies on the next boot. Console-only installations
+remain headless. Changed login settings have `*.before-library` backups.
+
+Verified on libraryd's GNOME/GDM desktop after an approved reboot: an active
+root Wayland session started automatically, Firefox ran as root with the
+Library URL, the homepage returned HTTP 200, and `start_library.service`
+completed with zero failed tasks. The root password was checked against the
+requested value without printing its hash. Five desktop configuration tests
+passed on Debian; 24 focused desktop/installer/progress tests passed locally.
+LightDM and SDDM configuration paths have fixture coverage but have not had a
+live desktop login test. Existing installation progress can also open in the
+new root desktop session.
+
 ## Restoration work (November 5, 2026)
 
 The entries below remain a record of the initial port, not a description of
@@ -17,8 +80,8 @@ Library_USB content is preserved.
 Firefox now opens a local HTML progress page on the logged-in desktop. It
 refreshes every 15 seconds and retains the success, failure or cancellation
 result. Progress and the complete log are saved on disk. Pi framebuffer
-hardware is not required. BIOS/UEFI OS cloning and automatic desktop login
-remain outside the implemented support.
+hardware is not required. BIOS/UEFI OS cloning remains outside the implemented
+support. Desktop autologin was added on November 6, as described below.
 
 The original targeted Clone regression suite has been restored and adapted.
 Additional menu, progress-page and USB safety tests cover the new behavior.

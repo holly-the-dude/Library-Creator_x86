@@ -7,18 +7,24 @@
 ARG BASE_IMAGE=localhost/rasbase_master:latest
 FROM ${BASE_IMAGE}
 
-# Use the matching x86 release, retaining the exact Kiwix version and theme.
+# Use the native release, retaining the exact Kiwix version and theme.
 RUN apt-get update && apt-get install -y --no-install-recommends python3 curl ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 ARG KIWIX_VERSION=3.5.0-1
-ARG KIWIX_SHA256=da50fc74d3d134b80e0fb9c43c5ea0c2cda0681f5b41c7ba6bdeb4a03afdc57c
-RUN test "$(dpkg --print-architecture)" = amd64 && \
-    curl -fsSL --retry 5 \
-      "https://download.kiwix.org/release/kiwix-tools/kiwix-tools_linux-x86_64-${KIWIX_VERSION}.tar.gz" \
+ARG KIWIX_SHA256_AMD64=da50fc74d3d134b80e0fb9c43c5ea0c2cda0681f5b41c7ba6bdeb4a03afdc57c
+ARG KIWIX_SHA256_ARM64=48e50d786ab8e629867dad1e3c37494a4a01f537685c4f049e3bd6b6b61b41a1
+RUN case "$(dpkg --print-architecture)" in \
+        amd64) KIWIX_ARCH=x86_64; KIWIX_SHA256="$KIWIX_SHA256_AMD64" ;; \
+        arm64) KIWIX_ARCH=aarch64; KIWIX_SHA256="$KIWIX_SHA256_ARM64" ;; \
+        *) echo 'Unsupported Kiwix architecture' >&2; exit 1 ;; \
+    esac && \
+    echo "Downloading Kiwix ${KIWIX_VERSION} for ${KIWIX_ARCH}" && \
+    curl -fL --retry 5 --connect-timeout 30 \
+      "https://download.kiwix.org/release/kiwix-tools/kiwix-tools_linux-${KIWIX_ARCH}-${KIWIX_VERSION}.tar.gz" \
       -o /tmp/kiwix-tools.tar.gz && \
     echo "${KIWIX_SHA256}  /tmp/kiwix-tools.tar.gz" | sha256sum -c - && \
     tar -xzf /tmp/kiwix-tools.tar.gz -C /tmp && \
-    cp /tmp/kiwix-tools_linux-x86_64-${KIWIX_VERSION}/kiwix-* /usr/local/bin/ && \
+    cp /tmp/kiwix-tools_linux-${KIWIX_ARCH}-${KIWIX_VERSION}/kiwix-* /usr/local/bin/ && \
     chmod +x /usr/local/bin/kiwix-* && \
     /usr/local/bin/kiwix-serve --version && \
     rm -rf /tmp/kiwix-tools*

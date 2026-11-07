@@ -64,7 +64,7 @@ window.addEventListener('pageshow', () => requestAnimationFrame(() => {{
 
 
 def launch_browser(page):
-    """Join the logged-in desktop session, never launch Firefox as root."""
+    """Join the logged-in desktop session, including the root Library desktop."""
     browser = shutil.which('firefox') or shutil.which('firefox-esr')
     if not browser:
         print('[INFO] Firefox is not installed yet; the progress page is available at ' + str(page), flush=True)
@@ -79,7 +79,7 @@ def launch_browser(page):
             text=True, capture_output=True, check=True)
         info = dict(x.split('=', 1) for x in result.stdout.splitlines() if '=' in x)
         if (info.get('Active') == 'yes' and info.get('Remote') == 'no'
-                and info.get('Type') in {'wayland', 'x11'} and info.get('User') != '0'):
+                and info.get('Type') in {'wayland', 'x11'}):
             candidates.append(info)
     if len(candidates) != 1:
         print(f'[INFO] No single active desktop session. Open {page.as_uri()} in Firefox after logging in.', flush=True)
@@ -97,7 +97,7 @@ def launch_browser(page):
         if not info.get('Display'):
             return False
         env += [f'DISPLAY={info["Display"]}']
-    if page.resolve().is_relative_to('/root'):
+    if page.resolve().is_relative_to('/root') and info['User'] != '0':
         # Firefox runs as the desktop user. Permit traversal to this readable
         # page without granting directory listing or access to private files.
         subprocess.run(['setfacl', '-m', f'u:{info["User"]}:--x', '/root'], check=True)

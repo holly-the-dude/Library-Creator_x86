@@ -1,5 +1,5 @@
 ---
-# Debian amd64 startup: existing storage, host networking, content containers.
+# Debian amd64/arm64 startup: existing storage, host networking, content containers.
 - name: Start Library
   hosts: localhost
   gather_facts: false

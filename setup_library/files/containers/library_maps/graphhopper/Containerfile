@@ -1,5 +1,5 @@
 # GraphHopper routing engine for library_maps.
-# Based on rasbase_master (Debian 13 trixie arm64). The base is a minbase
+# Based on rasbase_master (Debian 13 trixie amd64 or arm64). The base is a minbase
 # rootfs with no JRE, so we install one and download the GraphHopper jar.
 ARG BASE_IMAGE=localhost/rasbase_master:latest
 FROM ${BASE_IMAGE}

@@ -1,6 +1,6 @@
 # library_maps
 
-A lightweight PMTiles map tile server for Raspberry Pi, based on `rasbase_master` (Debian 13, arm64).
+A lightweight PMTiles map tile server for Debian AMD64/ARM64 hosts, based on `rasbase_master` (Debian 13).
 
 Serves `.pmtiles` files via nginx with HTTP range request support. Includes a built-in MapLibre GL JS viewer with a state selector, in-tile place/street search, a map-layer on/off panel, and optional car routing (turn-by-turn directions) via a bundled GraphHopper service. It is fully offline: no geocoder/Photon and no internet/CDN access are required at runtime.
 
@@ -342,7 +342,7 @@ The `build_state_pmtiles.sh` script can generate PMTiles from Geofabrik OSM extr
 
 ## Container Details
 
-- **Base image**: `localhost/rasbase_master:latest` (Debian 13 trixie, arm64)
+- **Base image**: `localhost/rasbase_master:latest` (Debian 13 trixie, amd64 or arm64)
 - **Web server**: nginx on port 8080
 - **GPS reader**: Python + pySerial, loopback status API on port 8765
 - **PMTiles CLI**: go-pmtiles 1.30.2 at `/usr/local/bin/pmtiles`

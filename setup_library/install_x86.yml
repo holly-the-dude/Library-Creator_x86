@@ -1,16 +1,16 @@
 ---
-- name: Install Library services on Debian amd64
+- name: Install Library services on Debian amd64 or arm64
   hosts: localhost
   connection: local
   gather_facts: true
   become: true
   tasks:
-    - name: Require Debian Trixie amd64
+    - name: Require Debian Trixie amd64 or arm64
       ansible.builtin.assert:
         that:
           - ansible_facts.distribution == 'Debian'
           - ansible_facts.distribution_release == 'trixie'
-          - ansible_facts.architecture == 'x86_64'
+          - ansible_facts.architecture in ['x86_64', 'aarch64']
 
     - name: Load storage settings
       ansible.builtin.include_vars: /etc/library/config.json
@@ -100,3 +100,15 @@
         enabled: true
         state: restarted
         daemon_reload: true
+
+    - name: Configure root desktop autologin and Firefox startup
+      ansible.builtin.command:
+        argv: [python3, "{{ playbook_dir }}/configure_desktop.py"]
+      register: library_desktop
+      changed_when: "'configured for the next boot' in library_desktop.stdout"
+      tags: [desktop_config]
+
+    - name: Report desktop configuration
+      ansible.builtin.debug:
+        var: library_desktop.stdout
+      tags: [desktop_config]

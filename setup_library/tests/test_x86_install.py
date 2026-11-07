@@ -1,4 +1,4 @@
-"""PC installer regression checks; all host paths and commands are sandboxed."""
+"""Native amd64/arm64 installer checks; host paths and commands are sandboxed."""
 import json
 import os
 from pathlib import Path
@@ -112,7 +112,7 @@ class InstallerTests(unittest.TestCase):
         self.assertTrue(library.is_symlink())
         self.assertEqual(json.loads(config.read_text())['library_storage_path'], str(usb))
 
-    def test_base_rejects_arm_and_builds_before_publishing_tag(self):
+    def mock_podman_builds(self):
         self.fake('uname', 'echo "${TEST_ARCH:-x86_64}"')
         self.fake('podman', '''printf '%s\\n' "$*" >> "$TEST_LOG"
 case "$1 $2" in
@@ -121,26 +121,82 @@ case "$1 $2" in
     'build --platform') exit "${BUILD_STATUS:-0}" ;;
     'run --rm') exit "${RUN_STATUS:-0}" ;;
 esac''')
+
+    def test_native_base_builds_and_verifies_both_architectures_before_tagging(self):
+        self.mock_podman_builds()
         script = str(CONTAINERS / 'rasbase/build_rasbase.sh')
-        result = self.run_shell('bash "$1"', script)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        calls = self.log.read_text().splitlines()
-        self.assertTrue(any('build --platform linux/amd64 --pull=always' in c for c in calls))
-        self.assertLess(next(i for i, c in enumerate(calls) if c.startswith('run ')),
-                        next(i for i, c in enumerate(calls) if c.startswith('tag ')))
-        self.log.unlink()
-        self.env['TEST_ARCH'] = 'aarch64'
+        for machine, arch in [('x86_64', 'amd64'), ('aarch64', 'arm64')]:
+            with self.subTest(arch=arch):
+                self.env['TEST_ARCH'] = machine
+                result = self.run_shell('bash "$1"', script)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                calls = self.log.read_text().splitlines()
+                self.assertTrue(any(f'build --platform linux/{arch} --pull=always' in c for c in calls))
+                verification = next(c for c in calls if c.startswith('run '))
+                self.assertIn(f'--env LIBRARY_EXPECTED_ARCH={arch}', verification)
+                self.assertLess(calls.index(verification), next(i for i, c in enumerate(calls) if c.startswith('tag ')))
+                self.log.unlink()
+        self.env['TEST_ARCH'] = 'armv7l'
         self.assertNotEqual(self.run_shell('bash "$1"', script).returncode, 0)
         self.assertFalse(self.log.exists())
-        self.env['TEST_ARCH'] = 'x86_64'
-        self.env.update(IMAGE_EXISTS='0', IMAGE_ARCH='arm64')
-        self.assertNotEqual(self.run_shell('bash "$1"', script).returncode, 0)
-        self.assertFalse(any(c.startswith(('build ', 'run ', 'tag '))
-                             for c in self.log.read_text().splitlines()))
-        self.log.unlink()
-        self.env.update(IMAGE_EXISTS='1', RUN_STATUS='9')
+
+    def test_cached_base_from_other_architecture_and_failed_validation_are_rejected(self):
+        self.mock_podman_builds()
+        script = str(CONTAINERS / 'rasbase/build_rasbase.sh')
+        for machine, wrong in [('x86_64', 'arm64'), ('aarch64', 'amd64')]:
+            self.env.update(TEST_ARCH=machine, IMAGE_EXISTS='0', IMAGE_ARCH=wrong)
+            self.assertNotEqual(self.run_shell('bash "$1"', script).returncode, 0)
+            self.assertFalse(any(c.startswith(('build ', 'run ', 'tag '))
+                                 for c in self.log.read_text().splitlines()))
+            self.log.unlink()
+        self.env.update(TEST_ARCH='aarch64', IMAGE_EXISTS='1', RUN_STATUS='9')
         self.assertNotEqual(self.run_shell('bash "$1"', script).returncode, 0)
         self.assertFalse(any(c.startswith('tag ') for c in self.log.read_text().splitlines()))
+
+    def test_preflight_accepts_native_64_bit_debian_and_rejects_mixed_userspace(self):
+        checkout = self.root / 'checkout'
+        containers = checkout / 'setup_library/files/containers'
+        containers.mkdir(parents=True)
+        shutil.copy(CONTAINERS / 'architecture.sh', containers)
+        (containers.parent / 'start_library.yml').touch()
+        release = self.root / 'os-release'
+        release.write_text('ID=debian\nVERSION_CODENAME=trixie\n')
+        systemd = self.root / 'systemd'
+        systemd.mkdir()
+        script = checkout / 'bootstrap'
+        script.write_text((ROOT / 'bootstrap').read_text().replace('/etc/os-release', str(release))
+                          .replace('/run/systemd/system', str(systemd)))
+        self.fake('uname', 'echo "$TEST_ARCH"')
+        self.fake('dpkg', 'echo "$TEST_DEB_ARCH"')
+        for machine, arch, accepted in [('x86_64', 'amd64', True), ('aarch64', 'arm64', True),
+                                        ('aarch64', 'armhf', False), ('x86_64', 'i386', False),
+                                        ('armv7l', 'armhf', False), ('riscv64', 'riscv64', False)]:
+            self.env.update(TEST_ARCH=machine, TEST_DEB_ARCH=arch)
+            result = self.run_shell('source "$1"; preflight', str(script))
+            self.assertEqual(result.returncode == 0, accepted, result.stderr)
+        release.write_text('ID=debian\nVERSION_CODENAME=bookworm\n')
+        self.env.update(TEST_ARCH='aarch64', TEST_DEB_ARCH='arm64')
+        self.assertNotEqual(self.run_shell('source "$1"; preflight', str(script)).returncode, 0)
+
+    def test_all_application_and_nested_builds_use_native_platform(self):
+        self.mock_podman_builds()
+        tree = self.root / 'containers'
+        (tree / 'rasbase').mkdir(parents=True)
+        for name in ('architecture.sh', 'build_pods.sh', 'rasbase/build_rasbase.sh'):
+            shutil.copy(CONTAINERS / name, tree / name)
+        for name in ('meshtastic', 'meshflash', 'library_maps', 'library_maps/graphhopper'):
+            folder = tree / name
+            folder.mkdir(parents=True, exist_ok=True)
+            (folder / 'Containerfile').write_text('FROM scratch\n')
+        for machine, arch in [('x86_64', 'amd64'), ('aarch64', 'arm64')]:
+            self.env.update(TEST_ARCH=machine)
+            result = self.run_shell('bash "$1"', str(tree / 'build_pods.sh'))
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            builds = [c for c in self.log.read_text().splitlines() if c.startswith('build ')]
+            self.assertEqual(len(builds), 5)  # base, three services, routing subimage
+            self.assertTrue(all(f'--platform linux/{arch}' in c for c in builds))
+            self.assertTrue(any('library_maps-graphhopper:11' in c for c in builds))
+            self.log.unlink()
 
     def test_hotspot_uses_named_adapter_and_rejects_non_ap_devices(self):
         self.fake('nmcli', '''printf '%s\\n' "$*" >> "$TEST_LOG"

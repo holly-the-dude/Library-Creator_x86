@@ -26,7 +26,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR" || exit 1
 
 # Every dependent build starts with a verified native base.
-build_options=(--platform linux/amd64 --format docker)
+. "$SCRIPT_DIR/architecture.sh"
+architecture=$(library_native_arch) || exit $?
+build_options=(--platform "linux/$architecture" --format docker)
+echo "[STEP] Building native Debian containers for $architecture"
 if [[ "${LIBRARY_REBUILD:-no}" == yes ]]; then
     bash "$SCRIPT_DIR/rasbase/build_rasbase.sh" --refresh || exit $?
     build_options+=(--no-cache)

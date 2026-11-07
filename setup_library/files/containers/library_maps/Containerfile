@@ -1,5 +1,5 @@
-# library_maps - PMTiles map tile server for Debian PCs
-# Based on rasbase_master (Debian 13 trixie amd64)
+# library_maps - PMTiles map tile server for Debian AMD64/ARM64 hosts
+# Based on rasbase_master (Debian 13 trixie amd64 or arm64)
 # Serves .pmtiles files via nginx with HTTP range request support
 # Compatible with MapLibre GL JS clients
 
@@ -8,7 +8,7 @@
 ARG BASE_IMAGE=localhost/rasbase_master:latest
 FROM ${BASE_IMAGE}
 
-LABEL description="PMTiles map tile server for offline maps on Debian PCs"
+LABEL description="PMTiles map tile server for offline maps on Debian AMD64/ARM64 hosts"
 
 # Python reads the appliance's serial GPS; nginx exposes its status to clients.
 RUN apt-get update && \

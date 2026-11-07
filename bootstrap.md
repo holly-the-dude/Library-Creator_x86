@@ -1,24 +1,24 @@
 # Bootstrap installer reference
 
-[`bootstrap`](bootstrap) contains the complete Debian Trixie amd64 installer.
+[`bootstrap`](bootstrap) contains the complete Debian Trixie amd64/arm64 installer.
 For hardware, storage, networking and content preparation, follow the
 [installation guide](docs/INSTALL.md). The [developer guide](docs/DEVELOPERS.md)
 and individual container READMEs explain the services, but some inherited
 instructions still describe the Raspberry Pi deployment paths.
 
-This reference describes the current x86 implementation. The menu and USB
+This reference describes the current native Debian implementation. The menu and USB
 workflow follow [`bootstrap_pi`](bootstrap_pi), the supplied Raspberry Pi
 reference. Pi boot/display operations are replaced with Debian services and a
 Firefox progress page; the existing content layout is retained.
 
 ## Start the installer
 
-Use an installed **Debian 13 (Trixie), amd64** system on a laptop, desktop or VM.
+Use an installed **Debian 13 (Trixie), amd64 or arm64** system on a laptop, desktop or VM.
 The installer checks the distribution, release, CPU architecture, systemd, and
 presence of the source files before making installation changes. It does not
 upgrade an older Debian installation to Trixie.
 
-Run from your x86 checkout:
+Run from this checkout on either supported architecture:
 
 ```bash
 cd /path/to/Library-Creator_x86
@@ -39,8 +39,8 @@ sudo /path/to/Library-Creator_x86/bootstrap --storage mounted
 
 Installation needs internet access for Debian packages, image builds, application
 packages and firmware downloads. Completed containers retain their downloaded
-assets for offline use. Native amd64 hardware is required for this build path;
-it does not configure ARM-to-x86 emulation.
+assets for offline use. Build on native AMD64 or ARM64 hardware with matching 64-bit Debian userspace;
+32-bit ARM/i386 and cross-architecture emulation are not supported.
 
 ## Commands and options
 
@@ -161,10 +161,10 @@ This creates or updates the `library-hotspot` NetworkManager profile with SSID
 `library`, address `10.1.1.1/24`, and shared DHCP/DNS. It replaces the selected
 adapter's client connection with AP mode. Use a console or Ethernet session for
 that change. The inherited hotspot container is not built or started by this
-x86 path. See [network configuration](docs/INSTALL.md#ethernet-wi-fi-and-vms).
+native Debian path. See [network configuration](docs/INSTALL.md#ethernet-wi-fi-and-vms).
 
 HDMI uses Debian's existing desktop. Bootstrap opens Firefox in the active
-non-root graphical session on a local progress file. No framebuffer or
+graphical session on a local progress file. No framebuffer or
 `displayit` is needed. Monitor resolution remains controlled by Debian.
 
 ## Firefox installation progress
@@ -179,12 +179,12 @@ final success screen links to `http://localhost`; a failure or cancellation
 stays on a failure screen with the stage and error output instead of claiming
 success. The same page reports Office, Clone and formatting operations.
 
-Firefox runs as the logged-in desktop user, not root. Installation over SSH
+Firefox runs as the logged-in desktop user, including root after autologin is configured. Installation over SSH
 can open the page on the machine's existing graphical session. If there is no
 single active graphical session, installation continues in the terminal and
 prints the file URL for opening after login. A minimal/headless install does
 not automatically acquire a desktop. Firefox is installed if needed.
-The installer grants that desktop user traversal permission on `/root` using
+For a non-root desktop, the installer grants that user traversal permission on `/root` using
 an ACL, so Firefox can read `progress.html` without listing the directory.
 Firefox launch errors are saved in `/var/log/library-installer/firefox.log`.
 
@@ -192,6 +192,36 @@ Formatting and other confirmations are answered in the installer terminal;
 the HTML page is a progress display. Full output is saved in
 `/var/log/library-installer/install.log`; the machine-readable status is
 `/root/library-install-state.json`.
+
+## Desktop autologin after installation
+
+After the Library services start successfully, a full install or rebuild sets
+the **root password to `library`** and configures the existing desktop login
+manager to log in as **root** on the next boot. GDM (GNOME), LightDM and SDDM
+are supported. A console-only installation stays headless; it needs an installed
+desktop/login manager for this feature.
+
+Root's desktop startup entry launches Firefox at **`http://localhost/`**. The
+browser helper waits up to three minutes for the homepage to respond, allowing
+the USB mount and containers to start. It uses the dedicated Firefox profile
+`/root/.mozilla/firefox/library`. The installer keeps the current desktop session
+open so you can see its final progress screen; reboot when ready to use autologin.
+
+The helper `setup_library/configure_desktop.py` backs up changed login settings
+as `*.before-library`. It changes the display manager's autologin settings and
+its root exclusion in the autologin PAM file, keeping the other account/session
+checks. Firefox starts through `/root/.config/autostart/library-browser.desktop`
+and `/usr/local/bin/library_browser`.
+
+To apply this feature to an existing installation without rebuilding images:
+
+```bash
+sudo ansible-playbook -i localhost, -c local setup_library/install_x86.yml --tags desktop_config
+```
+
+Configuration references: [GNOME automatic login](https://help.gnome.org/system-admin-guide/login-automatic.html),
+[LightDM configuration](https://wiki.freedesktop.org/www/Software/LightDM/CommonConfiguration/),
+and [Debian SDDM settings](https://manpages.debian.org/trixie/sddm/sddm.conf.5.en.html).
 
 ## Optional Office add-on
 
@@ -223,12 +253,12 @@ See the [Office guide](setup_library/files/containers/craft_apps/README.md).
 
 ## Installation stages
 
-The current x86 implementation runs these stages in one invocation. There are
+The current native Debian implementation runs these stages in one invocation. There are
 no First/Second/Third Boot flags or automatic installer reboots.
 
 ### 1. Preflight and host packages
 
-Validate Debian Trixie amd64 and the checkout, require root for installation,
+Validate Debian Trixie, matching amd64/arm64 hardware and userspace, and the checkout, require root for installation,
 and acquire `/run/lock/library-install.lock`. Read saved choices and check the
 selected mounted-storage mode. Install Podman, Ansible, Python dependencies,
 rsync, curl, jq, Firefox, Git, certificates and filesystem utilities using Debian packages.
@@ -240,14 +270,14 @@ existing mount/directory. Copy the selected checkout to `/opt/library-creator`, 
 cache directories and `rasbase_parts`. Run `build_pods.sh` from the staged copy.
 
 The builder first prepares `localhost/rasbase_master:latest` from the official
-`docker.io/library/debian:trixie-slim` image for `linux/amd64`. It verifies the
+`docker.io/library/debian:trixie-slim` image for the detected `linux/amd64` or `linux/arm64` platform. It verifies the
 image's architecture and Debian release. An existing compatible base is reused;
 an incompatible base is rejected with instructions to refresh it. ARM archive
-parts are never reconstituted into the x86 base.
+parts are never reconstituted into either native base.
 
 Application Containerfiles use that base except LMS and Office, which use their
-own upstream images. Kiwix uses the pinned x86-64 archive with SHA-256 checking;
-PMTiles selects the x86-64 release asset. The nested GraphHopper image is built
+own upstream images. Kiwix selects the pinned x86-64 or aarch64 archive with its own SHA-256 check;
+PMTiles selects the matching x86-64 or arm64 release asset. The nested GraphHopper image is built
 as `localhost/library_maps-graphhopper:11`. Podman uses Docker image format to
 preserve health checks; installing Docker is unnecessary.
 
@@ -266,7 +296,7 @@ to persist mounted storage, install host helpers and systemd units, copy the
 runtime playbook to `/root/start_library.yml`, and start the services.
 
 The numbered `01_install_ansible.yml` and `99_reinstall_pods.yml` now forward to
-this x86 service installer. They are not equivalents of their original Pi
+this native Debian service installer. They are not equivalents of their original Pi
 workflows and require the configuration and images prepared by bootstrap.
 
 ### 4. Normal service startup
@@ -313,7 +343,7 @@ helper/socket, recreates only the downloader with its socket, and verifies that
 the socket is visible inside the container. Existing USB clone confirmation,
 capacity, device-identity and destination-removal checks remain in place.
 
-On x86, the service permits **Library USB content cloning only**. It protects
+On both architectures, the service permits **Library USB content cloning only**. It protects
 mounted Debian boot/EFI filesystems without requiring `/boot/firmware`.
 BIOS/UEFI operating-system cloning is not implemented; selecting OS cloning
 returns an explicit unsupported-layout error. See the
@@ -351,8 +381,8 @@ sudo podman logs data_download
 
 ## Troubleshooting
 
-- **Wrong OS or architecture:** use Debian Trixie amd64. This path does not
-  upgrade the host or build under ARM emulation.
+- **Wrong OS or architecture:** use Debian Trixie amd64 or arm64 with matching 64-bit userspace. This path does not
+  upgrade the host or configure cross-architecture emulation.
 - **Content disk missing:** inspect `readlink -f /Library`, `findmnt -T /Library`
   and `/etc/fstab`. Restore the expected mount before restarting Library.
 - **Base image has the wrong architecture:** refresh it with

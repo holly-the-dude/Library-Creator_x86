@@ -59,7 +59,7 @@ class OfficeFixture(unittest.TestCase):
         helper = (CONTAINERS/'craft_apps/set-enabled.sh').read_text()
         # All Podman calls are mocked; bypass only the privilege guard in this fixture.
         (self.root/'craft_apps/set-enabled.sh').write_text(helper.replace('$EUID', '0'))
-        for name in ['build_pods.sh', 'create_tar_pods.sh']:
+        for name in ['architecture.sh', 'build_pods.sh', 'create_tar_pods.sh']:
             shutil.copy(CONTAINERS/name, self.root/name)
 
     def data(self): return json.loads(self.state.read_text())

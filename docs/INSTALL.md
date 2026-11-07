@@ -1,7 +1,23 @@
-# Install on Debian 13 (Trixie), amd64
+# Install on Debian 13 (Trixie), amd64 or arm64
 
-Use an existing Debian **amd64** install on a PC or VM. Trixie's i386 packages
-are for compatibility on amd64; this installer does not support a 32-bit OS.
+Use an existing Debian **amd64 or arm64** install on a PC, ARM64 machine or VM.
+The installer detects the native CPU and requires matching 64-bit Debian userspace.
+Neither i386 nor armhf/32-bit ARM is supported. Install and boot Debian first;
+this does not create board-specific boot media or add Raspberry Pi display drivers.
+
+The same checkout and root `bootstrap` entry point work on either architecture:
+
+| Host CPU / Debian architecture | Container platform | Kiwix binary | PMTiles binary |
+| --- | --- | --- | --- |
+| x86_64 / amd64 | linux/amd64 | x86_64 | x86_64 |
+| aarch64 / arm64 | linux/arm64 | aarch64 | arm64 |
+
+`Library-Creator_x86` and `setup_library/install_x86.yml` retain their filenames
+for compatibility; both architectures use them. Build the containers on the
+destination architecture. An existing base image from the other architecture
+is rejected; use Rebuild Containers to create a fresh native base. The copied
+Pi `rasbase_parts` are ignored on ARM64 as well as AMD64.
+
 Debian's installer handles UEFI/BIOS, disks, firmware, Ethernet, Wi-Fi, and HDMI.
 The Library installer does not upgrade the host distribution.
 
@@ -11,7 +27,7 @@ imports are especially large. Routing memory depends on the chosen OSM region.
 
 ## Install
 
-Copy this complete x86 checkout to the target machine and run from that copy:
+Copy this complete checkout to the target machine and run from that copy:
 
 ```bash
 ./bootstrap --check
@@ -104,16 +120,22 @@ Use Debian's normal HDMI desktop and browser, opening `http://localhost`.
 During installation Firefox opens a local HTML progress page on the logged-in
 desktop. It refreshes every 15 seconds through to success or failure:
 `file:///root/progress.html`. A minimal/headless Debian
-install remains a console unless you install a Debian desktop yourself. This installer does not replace the display manager,
-create a `pi` user, enable desktop autologin, or configure a kiosk.
+install remains a console unless you install a Debian desktop yourself.
+After successful installation, existing GDM/GNOME, LightDM or SDDM desktops
+are configured to autologin as **root**, with password **`library`**, on the next
+boot. Firefox then opens **`http://localhost/`**, waiting up to three minutes for
+Library services to become ready. The current desktop is left open through the
+final installer screen; reboot when ready. See [desktop autologin details](../bootstrap.md#desktop-autologin-after-installation).
 Pi TFT, touchscreen, GPIO, SPI overlays and framebuffer splash services are
-excluded from the x86 installation path.
+excluded from this installation path on both architectures.
 
 ## Images and rebuilds
 
-`rasbase_parts` and the bundled ARM Kiwix archive are inherited files; the x86
-build does not use them. The shared base is freshly built from the official
-Debian Trixie slim image and checked for Debian, Trixie, and amd64 before use.
+`rasbase_parts` and the bundled ARM Kiwix archive are inherited files; the native
+builds do not load them. Kiwix is downloaded and checksum-verified for the target
+architecture. The shared base is freshly built from the official Debian Trixie
+slim image and checked for Debian, Trixie, and the native amd64/arm64 architecture
+before use.
 To refresh it and rebuild the applications:
 
 ```bash
@@ -124,7 +146,7 @@ sudo ./bootstrap
 
 `build_pods.sh` also prepares/verifies the base before building applications.
 The local base tag stays `localhost/rasbase_master:latest` for compatibility
-with the existing Containerfiles. Native amd64 builds are required.
+with the existing Containerfiles. Native amd64 or arm64 builds are required; downloaded executables and upstream images match the host.
 
 Office is built and retained as `localhost/craft_apps:dontrun` when declined.
 Use `sudo ./bootstrap --office yes` or `--office no` to change the remembered

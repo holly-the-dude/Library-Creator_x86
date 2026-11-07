@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Library
+Comment=Open the Library when the desktop starts
+Exec=/usr/local/bin/library_browser
+Terminal=false
+X-GNOME-Autostart-enabled=true

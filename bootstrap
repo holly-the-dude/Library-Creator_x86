@@ -14,7 +14,7 @@ fi
 
 usage() {
     cat <<'EOF'
-Library installer — Debian Trixie amd64
+Library installer — Debian Trixie amd64 / arm64
   sudo ./bootstrap                       Interactive menu
   sudo ./bootstrap --install [options]   Fresh install / retry
   sudo ./bootstrap --rebuild [options]   Rebuild images and refresh services
@@ -36,15 +36,20 @@ EOF
 }
 
 preflight() {
-    local ID='' VERSION_CODENAME=''
+    local ID='' VERSION_CODENAME='' architecture
     . /etc/os-release
-    if [[ "$ID" != debian || "$VERSION_CODENAME" != trixie || "$(uname -m)" != x86_64 ]]; then
-        echo 'This installer requires Debian 13 (trixie) amd64 on a PC or VM.' >&2
+    if [[ "$ID" != debian || "$VERSION_CODENAME" != trixie ]]; then
+        echo 'This installer requires Debian 13 (trixie), amd64 or arm64.' >&2
         return 1
     fi
+    . "$SOURCE_DIR/setup_library/files/containers/architecture.sh"
+    architecture=$(library_native_arch) || return
+    [[ "$(dpkg --print-architecture)" == "$architecture" ]] || {
+        echo 'Install a native 64-bit Debian OS matching the hardware architecture.' >&2; return 1;
+    }
     [[ -d /run/systemd/system ]] || { echo 'A booted systemd host is required.' >&2; return 1; }
     [[ -f "$SOURCE_DIR/setup_library/files/start_library.yml" ]] || return 1
-    echo 'Debian Trixie amd64 preflight passed.'
+    echo "Debian Trixie $architecture preflight passed."
 }
 
 
@@ -62,7 +67,7 @@ confirm() {
 banner() {
     printf '%s╔══════════════════════════════════════════════════╗%s\n' "$CYAN" "$NC"
     printf '%s║%s       Library Bootstrap Installer                %s║%s\n' "$CYAN" "$WHITE" "$CYAN" "$NC"
-    printf '%s║%s       Debian Trixie x86-64 Edition                %s║%s\n' "$CYAN" "$YELLOW" "$CYAN" "$NC"
+    printf '%s║%s       Debian Trixie AMD64 / ARM64                 %s║%s\n' "$CYAN" "$YELLOW" "$CYAN" "$NC"
     printf '%s╚══════════════════════════════════════════════════╝%s\n' "$CYAN" "$NC"
 }
 
@@ -287,7 +292,7 @@ install_library() {
     if [[ "$storage" == mounted ]]; then
         mountpoint -q /Library || { msg_error 'Mount your content disk at /Library first.'; return 1; }
     fi
-    msg_step "Staging the selected x86 checkout"
+    msg_step "Staging the selected Library checkout"
     # Stage only this checkout. Neither the Pi repository nor its ARM archives
     # are used, even when the checkout was launched from another directory.
     install -d -m 0755 /opt/library-creator /etc/library
@@ -326,6 +331,7 @@ PY
     msg_step "Library installation complete"
     echo 'Library installed. Open http://localhost or http://<this-machine-IP> from your browser.'
     echo 'HDMI uses the existing Debian desktop/console. No reboot is required.'
+    echo 'On supported desktops, the next boot logs in as root (password: library) and opens Firefox at the Library.'
 }
 
 

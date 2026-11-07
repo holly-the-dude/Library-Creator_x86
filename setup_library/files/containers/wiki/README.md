@@ -2,6 +2,11 @@
 
 The wiki container runs [kiwix-serve](https://github.com/kiwix/kiwix-tools) to provide offline access to Wikipedia and other ZIM-format wiki content. It serves a web interface on port 6902 that lets users browse the wiki library.
 
+The build detects Debian `amd64` or `arm64`, downloads Kiwix 3.5.0-1 for
+`x86_64` or `aarch64`, and checks the architecture-specific SHA-256 before
+installation. Download progress is visible in the installer output. The bundled
+ARM archive remains a theme-test fixture; normal builds download the pinned release.
+
 ## File Structure
 
 ```
@@ -22,8 +27,8 @@ highlights. Catalog filters wrap on small screens. Articles inside the ZIM files
 keep their original formatting and colors.
 
 The image build runs `build_theme.py` to append `library-theme.css` to the original
-stylesheets embedded in the bundled Kiwix binary. This preserves its layout and
-responsive rules. The helper reads the ARM binary as data and checks that all
+stylesheets embedded in the selected Kiwix binary. This preserves its layout and
+responsive rules. The helper reads the selected binary as data and checks that all
 four expected stylesheets exist before writing any output. If the binary is
 upgraded, review the extraction rules and theme against its new UI.
 

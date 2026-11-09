@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Library
+Comment=Open your Library homepage
+Exec=xdg-open http://localhost/
+Icon=accessories-dictionary
+Terminal=false
+Categories=Education;

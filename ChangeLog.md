@@ -5,6 +5,27 @@ newest first. Dates are commit dates, not versioned release dates. Related commi
 are grouped together; routine housekeeping and documentation-only edits are omitted
 unless they affect installation or use.
 
+## Unreleased — Native Debian installation and Wi-Fi controls
+
+These changes apply to **Library-Creator_x86**. **Library-Creator** remains a
+separate Raspberry Pi project.
+
+- Seed empty selected storage from `setup_library/files/Library_USB.tar` before
+  services create directories or databases; tolerate a lone `lost+found` and
+  preserve nonempty storage.
+- Reboot within one minute after successful installation or rebuild, with an
+  explicit browser completion notice. Failed installations do not schedule it.
+- Add **Library Wi-Fi** to the root desktop and applications menu. Switch a
+  selected adapter between internet Wi-Fi and an open `library` hotspot with no
+  password; clients use `http://10.1.1.1/`. Ethernet remains independent.
+- Serve Wi-Fi controls only on loopback through `library-wifi.service`, retain
+  mode choices across reboots, and attempt connection recovery after failure.
+- Install Desktop Icons NG on GNOME and prepare the executable launcher.
+- Explain in build output that host NetworkManager replaces the hotspot container.
+- Open Firefox immediately at desktop login with a local Ansible startup-progress
+  page; redirect after success and retain errors on failure. Add a separate
+  Library desktop and applications-menu shortcut.
+
 ## 2026-11-01 — Optional HTTPS Office add-on
 
 - Use only the HTTPS Selkies viewer on port 3001; remove the HTTP noVNC viewer.

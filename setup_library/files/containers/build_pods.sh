@@ -55,7 +55,10 @@ echo
 for dir in */; do
     name="${dir%/}"
     # Host NetworkManager provides the optional PC hotspot.
-    [[ "$name" == hotspot ]] && continue
+    if [[ "$name" == hotspot ]]; then
+        echo "[INFO] Hotspot uses host NetworkManager; no hotspot container is needed."
+        continue
+    fi
     tag="localhost/${name}:latest"
 
     # Only process folders that have a Containerfile (or Dockerfile).

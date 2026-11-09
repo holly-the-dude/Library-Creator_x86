@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Library Wi-Fi
+Comment=Switch between Library hotspot and internet Wi-Fi
+Exec=/usr/local/bin/library_wifi
+Icon=network-wireless
+Terminal=false
+Categories=Network;

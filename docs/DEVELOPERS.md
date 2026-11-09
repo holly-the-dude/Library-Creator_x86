@@ -1,7 +1,9 @@
 # Developer Guide
 
-This guide explains how **Library-Creator** is put together: the architecture, the
-container build pipeline, the three-stage install, and how to add or modify services.
+This guide describes **Library-Creator_x86**, the native Debian Trixie
+amd64/arm64 project: its architecture, installer, and services.
+**Library-Creator** is a separate Raspberry Pi project; retained Pi scripts and
+container definitions are references, not this project’s installation path.
 
 If you just want to build a device, read [INSTALL.md](INSTALL.md). If you want to use a
 running device, read [USAGE.md](USAGE.md).
@@ -15,11 +17,13 @@ and [testing guide](../setup_library/files/containers/data_download/docs/TESTING
 
 ## What the project is
 
-Library-Creator turns a Raspberry Pi into an **offline "library in a box."** or in the parlance of our times **A Personal Cloud Device** It:
+Library-Creator_x86 turns a Debian laptop, desktop, ARM64 machine, or VM into
+an offline library. It:
 
 - Runs a self-hosted WiFi **hotspot** (open SSID `library`) so clients need no existing network.
 - Serves a **web hub** plus a set of content services, each in its own Podman container.
-- Stores all content on a USB drive (label `Library_USB`, exFAT) mounted at `/Library`.
+- Stores content at `/Library`, using a system directory or a selected mounted
+  filesystem; USB and exFAT are optional.
 - Requires internet **only at build time**; the finished device is fully offline.
 
 Everything is orchestrated from a single interactive installer script, `bootstrap`, backed
@@ -46,9 +50,9 @@ for discovery, port mapping and deployment.
 %%{init: {"theme":"base","themeVariables":{"primaryColor":"#1565c0","primaryTextColor":"#ffffff","primaryBorderColor":"#0d47a1","secondaryColor":"#4b5563","secondaryTextColor":"#ffffff","tertiaryColor":"#4b5563","tertiaryTextColor":"#ffffff","textColor":"#ffffff","lineColor":"#22c55e","defaultLinkColor":"#22c55e","clusterBkg":"#4b5563","clusterBorder":"#9ca3af","titleColor":"#ffffff","edgeLabelBackground":"#4b5563","noteBkgColor":"#4b5563","noteTextColor":"#ffffff"}}}%%
 flowchart TB
     client("Client browser")
-    subgraph pi["Raspberry Pi host"]
-        hotspot("Hotspot: wlan0<br/>10.1.1.1 · SSID library")
-        subgraph network["Podman bridge: 10.88.0.0/24"]
+    subgraph pi["Debian amd64 / arm64 host"]
+        hotspot("Host NetworkManager: selected Wi-Fi adapter<br/>10.1.1.1 · open SSID library")
+        subgraph network["Podman bridge: 10.88.0.0/16"]
             hub("webserver · 10.88.0.201:80<br/>nginx + library.py")
             subgraph services["Application containers · internal addresses"]
                 wiki("wiki · 10.88.0.200:6902")
@@ -81,9 +85,17 @@ flowchart TB
     style services fill:#4b5563,stroke:#9ca3af,color:#ffffff,stroke-width:2px,rx:12,ry:12;
 ```
 
-- The **hotspot** container owns `wlan0`, assigns itself `10.1.1.1/24`, and runs `hostapd`
-  (SSID `library`, open, channel 7) plus `dnsmasq` for DHCP (`10.1.1.10–10.1.1.100`) and
-  DNS (`library` / `library.local` → `10.1.1.1`).
+- Host **NetworkManager** configures the selected AP-capable adapter with open
+  SSID `library`, address `10.1.1.1/24`, and shared DHCP/DNS. The inherited hotspot
+  container is skipped. A single adapter uses either AP or internet-client mode;
+  Ethernet remains independent. Use the numeric address for reliable hotspot access.
+- **Library Wi-Fi** is a local desktop launcher, not a homepage control. It opens
+  `http://127.0.0.1:4830/wifi/`, served by `library-wifi.service` using Gunicorn
+  and Flask. Only loopback is bound. Requests use session CSRF tokens, validate
+  local Host headers and adapter names, and serialize mode changes. Switching
+  is delayed until the confirmation response is sent. Failed connections attempt
+  to restore the previous NetworkManager connection. Internet credentials go to
+  nmcli through stdin; hotspot mode does not use credentials.
 - The **webserver** is the hub: nginx on port 80 plus `library.py`, which probes each
   service. **Music** groups LMS and the iPod-style player; **Maps** groups
   OpenStreetMap and StreetZim. Unavailable choices remain visible as **Not running**.
@@ -134,21 +146,23 @@ Library-Creator/
 │   ├── USAGE.md              # Usage guide (end users)
 │   └── DEVELOPERS.md         # This file
 └── setup_library/
-    ├── 01_install_ansible.yml   # Main playbook: services, systemd, network, display
-    ├── 02_mount_usb.yml         # Detect & mount the Library_USB drive
-    ├── 03_start_containers.yml  # Start display/hotspot/wiki/music/webserver, report status
+    ├── install_x86.yml          # Native host services and desktop configuration
+    ├── configure_desktop.py    # Autologin, Firefox and Wi-Fi desktop shortcut
+    ├── 01_install_ansible.yml   # Compatibility wrapper for the native installer
+    ├── 02_mount_usb.yml         # Retained Pi storage reference
+    ├── 03_start_containers.yml  # Retained older startup path
     ├── 99_reinstall_pods.yml    # Refresh/reload container images
     └── files/
         ├── start_library.yml    # Runtime orchestration; --tags mesh selects radio services
-        ├── Library_USB.tar      # Base content skeleton unpacked onto the USB
+        ├── Library_USB.tar      # Starter content for any empty selected storage
         ├── 87-podman-bridge.conflist  # Podman network (static 10.88.0.x IPs)
         └── containers/
             ├── build_pods.sh        # Build every container that has a Containerfile
             ├── create_tar_pods.sh   # Save built images to <name>.tar
-            ├── reconstitute.sh      # Reassemble rasbase.tar from split parts, load it
+            ├── reconstitute.sh      # Compatibility entry point for native base build
             ├── update_rasbase.sh    # Upgrade the rasbase base image release-by-release
             ├── rasbase_parts/       # Split parts of the base image tarball
-            ├── hotspot/             # WiFi AP (hostapd + dnsmasq)
+            ├── hotspot/             # Retained Pi reference; skipped in native builds
             ├── webserver/           # nginx hub + library.py service monitor
             ├── wiki/                # Kiwix server
             ├── music/               # LMS music server
@@ -170,29 +184,14 @@ authoritative reference for each service.
 
 ## The base image: `rasbase`
 
-Most service containers default to **`localhost/rasbase_master:latest`**, the updated
-ARM64 Debian userland. Music uses `docker.io/epoupon/lms:latest`; GraphHopper has its
-own Containerfile. The older **rasbase** archive is stored as split parts under
-`containers/rasbase_parts/` and reconstructed before the base upgrade.
-
-- **`reconstitute.sh`** — concatenates the split parts back into `rasbase.tar` and loads
-  it into Podman:
-
-  ```bash
-  bash reconstitute.sh
-  ```
-
-- **`update_rasbase.sh`** — upgrades the base image to the newest **stable** Debian
-  release that Raspberry Pi OS ships. It reads the current codename from the image,
-  detects the target from the Raspberry Pi OS image index, then dist-upgrades one release
-  at a time (`bullseye → bookworm → trixie → …`), committing at each hop. Finally it
-  flattens the layers into one to reclaim space and verifies the resulting codename.
-  It's safe to run repeatedly.
-
-The hotspot, webserver, wiki, calibre-web, maps, StreetZim, music_player,
-data_download, Meshtastic and meshflash images
-use `rasbase_master` by default. Their `BASE_IMAGE` build argument can select a
-compatible alternative; check each Containerfile and service README.
+Most service containers use **`localhost/rasbase_master:latest`**, built from
+`debian:trixie-slim` for the detected native amd64 or arm64 platform by
+`rasbase/build_rasbase.sh`. LMS and Office use their upstream images.
+`build_pods.sh` builds the base first and stops installation on required build
+failures. It explicitly skips the inherited hotspot container, since
+NetworkManager owns host Wi-Fi. The compatibility `reconstitute.sh` builds the
+native base; copied ARM archives and the separate Raspberry Pi project’s base
+upgrade flow are not used here.
 
 ---
 
@@ -201,7 +200,7 @@ compatible alternative; check each Containerfile and service README.
 Two scripts in `setup_library/files/containers/` do the heavy lifting. Both discover
 containers by scanning for subdirectories that contain a `Containerfile` (or `Dockerfile`).
 
-1. **`build_pods.sh`** — for each container folder, removes the old image and rebuilds it:
+1. **`build_pods.sh`** — builds the native base, then each supported container:
 
    ```bash
    cd setup_library/files/containers
@@ -210,7 +209,7 @@ containers by scanning for subdirectories that contain a `Containerfile` (or `Do
 
    Images are tagged `localhost/<folder>:latest`, including **meshtastic** and
    **meshflash**. Both radio Containerfiles must exist or the script exits before
-   removing images. Each is built once, using its explicit Containerfile path.
+   changing images. Each is built once, using its explicit Containerfile path.
    Build failures are summarized and return a nonzero exit status.
 
    Discovery also includes `street_zim`, `music_player`, and `data_download`.
@@ -218,15 +217,15 @@ containers by scanning for subdirectories that contain a `Containerfile` (or `Do
    `HEALTHCHECK` instructions; this selects an image format and does not require
    the Docker runtime.
 
-   The script uses `podman rmi --force` before rebuilding. Run it during maintenance,
-   never during a radio flash. Use the same rootful Podman image store for building,
+   Existing images remain available until a replacement build succeeds. Run
+   builds during maintenance, never during a radio flash. Use the same rootful Podman image store for building,
    exporting, loading and appliance startup.
 
    It also builds nested routing subimages: any `*/graphhopper/Containerfile` is built as
    `<parent>-graphhopper:11` (e.g. `library_maps/graphhopper` → `library_maps-graphhopper:11`).
 
 2. **`create_tar_pods.sh`** — saves each built image to `<name>.tar` for offline
-   deployment or transfer to another Pi (the installer can also build on the Pi):
+   deployment to another machine of the same architecture:
 
    ```bash
    sudo ./create_tar_pods.sh
@@ -248,24 +247,35 @@ sudo podman build --format docker -t localhost/webserver:latest -f Containerfile
 
 ---
 
-## The install flow (three boot stages)
+## Native Debian install flow
 
-`bootstrap` is a color-coded, menu-driven script. A fresh install runs in three stages,
-each separated by a reboot; a cron entry (`/root/bootstrap --auto`) resumes the next stage
-automatically within 5 minutes of boot. Progress is tracked with flag files in `/root`
-(`.0boot`, `.firstboot`, `.secondboot`, `.thirdboot`).
+`bootstrap` performs one installation run under `/run/lock/library-install.lock`:
 
-| Stage | Key actions | Driven by |
-|-------|-------------|-----------|
-| **First Boot** | Format USB as `Library_USB` (exFAT, GPT), unpack base content, `apt` install (Python, Ansible, Podman, display drivers), build containers (`reconstitute.sh` → `update_rasbase.sh` → `build_pods.sh`), configure display (TFT via LCD-show, or HDMI via KMS), set WiFi country, install resume cron | `bootstrap` `do_first_boot` |
-| **Second Boot** | Show "configuring" splash, run `01_install_ansible.yml` (Podman network, systemd services, display splash services, WiFi, touch input, load container images), verify `shutdown_library.service` | `01_install_ansible.yml` |
-| **Third Boot** | Remove resume cron, show "ready" splash, clean up temporary network config, final reboot into production | `bootstrap` `do_third_boot` |
+1. Validate the host and storage choice, install host dependencies, and stage
+   this checkout at `/opt/library-creator`.
+2. Seed empty `/Library` storage from `setup_library/files/Library_USB.tar`,
+   ignoring only `lost+found` in the emptiness check. Nonempty storage is retained.
+3. Build native images, then publish `/etc/library/config.json`.
+4. Run `setup_library/install_x86.yml` to install host services, the Wi-Fi tool,
+   and `/root/start_library.yml`; start content services and configure desktop login.
+5. Schedule one reboot within one minute after success. The browser completion
+   page announces the reboot. Failure does not schedule it.
 
-At runtime, `start_library.service` runs `/root/start_library.yml`, copied from
-`setup_library/files/start_library.yml`. This is the current orchestration playbook;
-`03_start_containers.yml` is an older separate startup path. The runtime playbook
-handles storage, cloning, hotspot, content services, maps/GPS, and radio service
-selection. It reports progress with the host's `displayit` splash helper.
+No Pi boot flags, resume cron jobs, or intermediate reboots are used. The
+First/Second/Third Boot workflow belongs to the separate **Library-Creator**
+Raspberry Pi project.
+
+At runtime, `start_library.service` uses `/usr/local/bin/library_startup.py` to
+run Ansible against `/root/start_library.yml`. The wrapper preserves output in
+the journal, publishes the current task and recent log lines atomically to
+`/run/library-startup/progress.html`, propagates the exit code, and redirects
+the browser only after successful completion. `library_browser` opens that local
+file immediately, without waiting for nginx. The Library desktop launcher opens
+`http://localhost/` directly. Content-based
+startup gates still apply: maps and LMS need content; fresh empty storage gets
+starter content before those gates are checked. StreetZim and the iPod-style
+player can start without content. Wi-Fi is controlled independently on the host.
+`03_start_containers.yml` and Pi display assets are retained references.
 
 The startup unit uses `Type=oneshot` with `RemainAfterExit=yes`: Ansible completes,
 but systemd must retain the unit and its detached container log monitors (`conmon`).
@@ -450,7 +460,11 @@ python3 -m unittest discover -s setup_library/files/containers/meshtastic/tests 
 python3 -m unittest discover -s setup_library/files/containers/meshflash/tests -v
 ```
 
-### microSD self-cloning
+### microSD self-cloning — separate Raspberry Pi project reference
+
+The following workflow describes the separate **Library-Creator** project.
+It is disabled in Library-Creator_x86; use the explicit USB-content clone
+controls in Downloads. Native BIOS/UEFI operating-system cloning is not implemented.
 
 `start_library.yml` includes a **self-cloning** feature that duplicates the running system
 onto a second microSD/USB disk — handy for mass-producing or backing up a finished
@@ -518,15 +532,16 @@ example.
 
 ## Local development tips
 
-- **Build/iterate on one container** on any arm64 Podman host without a Pi:
+- **Build/iterate on one container** on a matching amd64 or arm64 Podman host:
   `podman build` + `podman run` using the flags in that container's README.
 - **Rebuild everything:** `build_pods.sh` then `create_tar_pods.sh`.
 - **Test the hub monitor** by running the webserver container with `/Library` mounted and
   hitting `http://localhost` — links appear as each backing service comes up.
-- **Restart a device's installation:** `./bootstrap` → `3) Restart Install` clears
-  boot flags and starts First Boot, or use `2) Reinstall / Upgrade` to also drop images.
-- **Logs:** `/root/install.log` (auto mode), `/root/installplay.log` (Ansible),
-  `podman logs <container>` for a specific service.
+- **Retry installation:** `./bootstrap` → `3) Restart Install` reruns the native
+  installer. `2) Reinstall / Upgrade` pulls the current checkout and rebuilds.
+  Successful full runs schedule a reboot; there are no Pi boot flags.
+- **Logs:** `/var/log/library-installer/install.log`, `journalctl -u start_library`,
+  `journalctl -u library-wifi`, and `podman logs <container>`.
 
 ---
 
@@ -546,7 +561,7 @@ example.
   End `linkStyle` lines with a newline rather than a semicolon: a trailing
   hex colour followed by `;` can be interpreted as an entity by Mermaid.
 - Container images are tagged `localhost/<name>:latest` and saved as `<name>.tar`.
-- Static container IPs live in `10.88.0.0/24`; the hotspot/gateway is `10.1.1.1`.
+- Static container IPs use the `10.88.0.0/16` bridge; the hotspot/gateway is `10.1.1.1`.
 - All persistent content lives under `/Library` (the USB) so images stay stateless.
 - Scripts print color-coded status (`[INFO]`/`[ OK]`/`[WARN]`/`[FAIL]`/`[STEP]`) and
   degrade to plain text when not attached to a terminal.

@@ -127,8 +127,9 @@ class ProgressTests(unittest.TestCase):
     def test_success_reaches_final_screen(self):
         state, page = self.exercise('print("[STEP] Starting services"); print("ready")', 0)
         self.assertEqual(state['status'], 'complete')
-        self.assertIn('Library is ready', page)
-        self.assertIn('http://localhost', page)
+        self.assertIn('Installation complete — reboot scheduled', page)
+        self.assertIn('will reboot automatically within one minute', page)
+        self.assertIn('browser will close during the reboot', page)
 
     def test_failed_build_stays_failed_and_escapes_log_html(self):
         state, page = self.exercise('print("[STEP] Building wiki"); print("<script>bad()</script>"); raise SystemExit(17)', 17)
@@ -137,6 +138,7 @@ class ProgressTests(unittest.TestCase):
         self.assertIn('&lt;script&gt;', page)
         self.assertNotIn('<script>bad()</script>', page)
         self.assertNotIn('Library is ready', page)
+        self.assertNotIn('reboot scheduled', page)
 
     def test_missing_worker_updates_failure_instead_of_staying_running(self):
         with tempfile.TemporaryDirectory() as directory, patch.object(progress, 'launch_browser', return_value=False):

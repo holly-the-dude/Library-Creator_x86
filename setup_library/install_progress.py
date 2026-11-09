@@ -38,6 +38,12 @@ def publish(directory, status, stage, output, code=None, operation='installation
              else '<p>The USB partition is ready. Return to the terminal menu to install Library.</p>' if status == 'complete'
              else '<p>Read the error below, correct it, and choose Restart Install.</p>' if status == 'failed'
              else '<p>Keep this machine powered on. Terminal prompts must be answered in the installer terminal.</p>')
+    if status == 'complete' and operation == 'installation':
+        title = 'Installation complete — reboot scheduled'
+        stage = 'This machine will reboot automatically within one minute.'
+        final = ('<p>Keep this machine powered on while it restarts. '
+                 'The browser will close during the reboot. On supported desktops, '
+                 'Firefox will open your Library automatically after startup.</p>')
     atomic(directory / STATE_FILE, json.dumps({'status': status, 'operation': operation, 'stage': stage,
            'updated': now, 'exit_code': code}, indent=2) + '\n')
     atomic(directory / 'progress.html', f'''<!doctype html>

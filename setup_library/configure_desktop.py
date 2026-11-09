@@ -103,6 +103,18 @@ def configure(root=Path('/')):
     write(root / 'usr/local/bin/library_browser', (source / 'library_browser').read_text(), 0o755)
     write(root / 'root/.config/autostart/library-browser.desktop',
           (source / 'library-browser.desktop').read_text())
+    write(root / 'root/Desktop/library-wifi.desktop',
+          (source / 'library-wifi.desktop').read_text(), 0o755)
+    write(root / 'usr/share/applications/library-wifi.desktop',
+          (source / 'library-wifi.desktop').read_text())
+    write(root / 'root/Desktop/library.desktop',
+          (source / 'library.desktop').read_text(), 0o755)
+    write(root / 'usr/share/applications/library.desktop',
+          (source / 'library.desktop').read_text())
+    write(root / 'usr/local/bin/library_desktop_icons',
+          (source / 'library_desktop_icons').read_text(), 0o755)
+    write(root / 'root/.config/autostart/library-desktop-icons.desktop',
+          (source / 'library-desktop-icons.desktop').read_text())
     write(root / 'root/.config/gnome-initial-setup-done', 'yes\n')
     write(root / 'root/.mozilla/firefox/library/user.js', '''// Library desktop browser defaults.
 user_pref("browser.startup.homepage", "http://localhost/");

@@ -1,0 +1,14 @@
+[Unit]
+Description=Library Wi-Fi mode controls
+Wants=NetworkManager.service
+After=NetworkManager.service
+
+[Service]
+ExecStart=/usr/bin/gunicorn --workers 1 --threads 4 --timeout 90 --bind 127.0.0.1:4830 --chdir /usr/local/lib/library-wifi library_wifi:app
+Restart=on-failure
+NoNewPrivileges=true
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

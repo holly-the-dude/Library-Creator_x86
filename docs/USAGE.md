@@ -3,7 +3,7 @@
 This guide is for **people using a Library device** that is already set up and running.
 Think of it as your own personal library that fits in the palm of your hand - Wikipedia,
 music and audiobooks, e-books, maps, Meshtastic Communications, and your own files,
-all in one place. Meshtastic needs a radio connected to the Library Pi. You don't need
+all in one place. Meshtastic needs a radio connected to the Library host. You don't need
 any technical knowledge, an account, or an internet connection - just a phone, tablet, or
 laptop with WiFi.
 
@@ -13,6 +13,10 @@ change content or understand how it works, see [DEVELOPERS.md](DEVELOPERS.md).
 ---
 
 ## Connecting to the Library
+
+For the native Debian version, the operator first enables hotspot mode using
+**Library Wi-Fi** on the machine’s desktop. Ethernet and normal internet Wi-Fi
+can also provide access using the machine’s address.
 
 1. On your phone or laptop, open the WiFi settings.
 2. Connect to the open network named **`library`**. There is no password.
@@ -26,8 +30,8 @@ You'll land on the **Library home page**, which shows links to every service tha
 available on this particular device. Not every device has every service - the home page
 only shows what's actually installed.
 
-> The Library has no connection to the internet. Everything you see is stored locally on
-> the device. You can use it anywhere, even with no cell signal.
+> Library content is stored locally and works without internet access. The
+> machine can also use Ethernet or internet Wi-Fi when the operator enables it.
 
 ---
 
@@ -50,8 +54,8 @@ The home page acts as a hub. Depending on what's installed, you may see:
 **Music** and **Maps** open menus with two choices each. A choice marked
 **Not running** is unavailable; available choices open in a new browser tab.
 
-You can share the device with many people at once - up to about 90 devices can connect to
-the WiFi hotspot simultaneously.
+Several people can use the Library at once. Hotspot capacity depends on the
+Wi-Fi adapter, driver, and available machine resources.
 
 ---
 
@@ -466,6 +470,10 @@ microSD cloning feature below.
 
 ## Making a duplicate or backup microSD card
 
+This section describes the separate **Library-Creator** Raspberry Pi project.
+Library-Creator_x86 does not implement native BIOS/UEFI system-disk cloning.
+Its Downloads page supports explicit USB-content cloning instead.
+
 The Library can **clone itself onto another microSD card** - a quick way to make a backup
 or hand copies to other people. The whole system (operating system, services, and
 settings) is copied; your **content on the USB drive is not** part of this and stays on the
@@ -512,7 +520,10 @@ The home page checks services when it is generated. Music and Maps keep their
 choices visible and label unavailable ones **Not running**; other unavailable
 services may have no link. Some services need content before they start.
 StreetZim and the iPod-style player can start with empty content folders when
-their images are installed. Ask the operator to check startup and content setup.
+their images are installed. New empty storage receives bundled starter content
+during installation, including a map, sample music, and a small wiki archive.
+Existing nonempty storage is preserved. Ask the operator to check startup and
+content setup if these services are unavailable.
 
 **I connected to WiFi but `http://library` won't load.**
 Try `http://10.1.1.1` directly. If your phone warns that the network "has no internet,"
@@ -546,3 +557,43 @@ connected users. Office is optional and its button is omitted when the service
 is not running as the homepage is generated. The owner can change the choice
 with bootstrap → **6) Configure Office**, then restart the Library. See the
 [Library Office guide](../setup_library/files/containers/craft_apps/README.md).
+
+### Switch Wi-Fi modes (native Debian version)
+
+Open **Library Wi-Fi** on the root desktop (or in the applications menu).
+The executable is `/usr/local/bin/library_wifi`.
+The local window detects Wi-Fi adapters and shows their connection status. No Wi-Fi
+adapter means the controls remain unavailable; Ethernet continues working.
+
+Select an adapter and either:
+
+- **Connect to internet Wi-Fi:** enter the network name (SSID) and password.
+  Leave the password blank to reuse credentials already saved by NetworkManager.
+- **Library hotspot:** clients join the open `library` network without a
+  password and open `http://10.1.1.1/`. The adapter must support access-point mode.
+
+Confirm the disconnection notice, then select **Switch Wi-Fi mode**. A single
+adapter cannot serve the hotspot and join internet Wi-Fi simultaneously.
+Use the desktop shortcut to reconnect after changing modes. The selected
+mode persists after reboot. Failed connections attempt to restore the previous
+connection. Enterprise Wi-Fi and captive-portal login should be configured using
+the desktop's NetworkManager tools.
+
+This version uses host NetworkManager, including DHCP/DNS for the hotspot.
+The legacy `hotspot` container is intentionally not built. Wi-Fi changes do not
+require rebuilding any content containers. Wi-Fi controls listen only on
+`127.0.0.1:4830`; they are available from the
+Library desktop, with no homepage link or remote network listener. GNOME
+desktops receive the Desktop Icons NG extension so the shortcut is visible
+after the installer reboots.
+
+
+### Desktop startup and Library shortcut
+
+On supported desktops, Firefox opens immediately after login and shows
+**Starting your Library** with the current Ansible task. The page refreshes as
+services start, then opens the Library homepage automatically. If startup fails,
+it keeps the error details visible for the operator.
+
+Use the **Library** desktop shortcut (or its applications-menu entry) to reopen
+the homepage. **Library Wi-Fi** remains a separate shortcut for network modes.

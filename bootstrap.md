@@ -131,7 +131,9 @@ The installer rechecks device identity after the countdown, refuses disks
 containing system/home/boot/swap filesystems, and formats only the selected
 partition as exFAT with label `Library_USB`. It does not erase the partition
 table or guess a whole disk from `fdisk` output. A new filesystem receives the
-bundled `Library_USB.tar` seed content; existing content is not overwritten by
+bundled `Library_USB.tar` seed content. Bootstrap also seeds an empty system
+directory or already mounted disk, ignoring `lost+found` when checking emptiness,
+before building and starting services. Existing content is not overwritten by
 that archive during a normal install. Formatting cannot be approved through
 `--yes` or noninteractive input.
 
@@ -154,11 +156,16 @@ The optional hotspot uses an explicitly selected AP-capable Wi-Fi adapter:
 
 ```bash
 nmcli device status
-sudo ./bootstrap --hotspot-interface wlp2s0 --hotspot-password 'choose-a-password'
+sudo ./bootstrap --hotspot-interface wlp2s0
 ```
 
 This creates or updates the `library-hotspot` NetworkManager profile with SSID
-`library`, address `10.1.1.1/24`, and shared DHCP/DNS. It replaces the selected
+`library` with no password, address `10.1.1.1/24`, and shared DHCP/DNS.
+After installation, use **Library Wi-Fi** on the root desktop or in the
+applications menu for routine switching between hotspot and internet Wi-Fi.
+The executable `/usr/local/bin/library_wifi` opens local-only controls at
+`http://127.0.0.1:4830/wifi/`. There is no homepage control. GNOME installs
+Desktop Icons NG to display the shortcut. Ethernet remains connected. It replaces the selected
 adapter's client connection with AP mode. Use a console or Ethernet session for
 that change. The inherited hotspot container is not built or started by this
 native Debian path. See [network configuration](docs/INSTALL.md#ethernet-wi-fi-and-vms).
@@ -201,11 +208,16 @@ manager to log in as **root** on the next boot. GDM (GNOME), LightDM and SDDM
 are supported. A console-only installation stays headless; it needs an installed
 desktop/login manager for this feature.
 
-Root's desktop startup entry launches Firefox at **`http://localhost/`**. The
-browser helper waits up to three minutes for the homepage to respond, allowing
-the USB mount and containers to start. It uses the dedicated Firefox profile
+Root's desktop startup entry opens Firefox immediately on
+`file:///run/library-startup/progress.html`. This page shows the current Ansible
+task while the USB mount and services start, refreshes every two seconds, and
+redirects to **`http://localhost/`** after startup succeeds. Errors remain visible
+instead of redirecting. The page works before nginx starts. The browser uses
+the dedicated Firefox profile
 `/root/.mozilla/firefox/library`. The installer keeps the current desktop session
-open so you can see its final progress screen; reboot when ready to use autologin.
+open so you can see its final progress screen. Successful installs and rebuilds
+schedule a reboot within one minute; the browser announces it. Keep power
+connected. Failed installations do not schedule a reboot.
 
 The helper `setup_library/configure_desktop.py` backs up changed login settings
 as `*.before-library`. It changes the display manager's autologin settings and
@@ -254,7 +266,8 @@ See the [Office guide](setup_library/files/containers/craft_apps/README.md).
 ## Installation stages
 
 The current native Debian implementation runs these stages in one invocation. There are
-no First/Second/Third Boot flags or automatic installer reboots.
+no First/Second/Third Boot flags or intermediate installer reboots. A successful
+run schedules one reboot within one minute after all setup steps finish.
 
 ### 1. Preflight and host packages
 
@@ -267,7 +280,8 @@ rsync, curl, jq, Firefox, Git, certificates and filesystem utilities using Debia
 
 Prepare the selected USB partition as described above, or verify the selected
 existing mount/directory. Copy the selected checkout to `/opt/library-creator`, excluding `.git`, Python
-cache directories and `rasbase_parts`. Run `build_pods.sh` from the staged copy.
+cache directories and `rasbase_parts`. Seed empty selected storage from
+`Library_USB.tar`, then run `build_pods.sh` from the staged copy.
 
 The builder first prepares `localhost/rasbase_master:latest` from the official
 `docker.io/library/debian:trixie-slim` image for the detected `linux/amd64` or `linux/arm64` platform. It verifies the
@@ -293,7 +307,10 @@ radio. StreetZim, the music player and downloader are also built. See the
 After the image builder succeeds, write `/etc/library/config.json`. If requested,
 install/configure the NetworkManager hotspot. Run `setup_library/install_x86.yml`
 to persist mounted storage, install host helpers and systemd units, copy the
-runtime playbook to `/root/start_library.yml`, and start the services.
+runtime playbook to `/root/start_library.yml`, and start the services. Install
+`library-wifi.service` and the local desktop launcher, configure desktop startup,
+then schedule the completion reboot. The Wi-Fi service runs on the host and does
+not require a hotspot container.
 
 The numbered `01_install_ansible.yml` and `99_reinstall_pods.yml` now forward to
 this native Debian service installer. They are not equivalents of their original Pi

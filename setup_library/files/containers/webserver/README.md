@@ -1,5 +1,11 @@
 # Webserver Container
 
+In **Library-Creator_x86**, Wi-Fi mode switching is available only through the
+**Library Wi-Fi** desktop shortcut or applications menu. It is not a homepage
+control and is not proxied by this container. The host service listens on
+`127.0.0.1:4830`; NetworkManager provides the open `library` hotspot. See the
+[Wi-Fi usage guide](../../../../docs/USAGE.md#switch-wi-fi-modes-native-debian-version).
+
 The webserver container is the main entry point for the Library system. It runs nginx to serve web content and a Python management script (`library.py`) that checks the other Library services and updates navigation links. Container startup
 and radio selection are handled by the runtime
 [`start_library.yml`](../../start_library.yml) playbook.

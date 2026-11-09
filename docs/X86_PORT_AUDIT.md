@@ -163,9 +163,10 @@ not establish that every implementation detail is correct.
 ## Additional behavior and maintenance risks
 
 - The hotspot now uses host NetworkManager instead of the hotspot container.
-  It is optional, password-protected, and uses an explicitly selected adapter.
-  This changes the original appliance networking experience. Physical AP-mode
-  behavior has only been mocked, not tested on a Wi-Fi adapter.
+  It uses open SSID `library` with no password and an explicitly selected adapter.
+  Desktop-only controls switch between hotspot and internet Wi-Fi. On `library`,
+  `wlp1s0` reports AP capability and Ethernet is connected. End-to-end client
+  association and mode-switch recovery still require physical validation.
 - Mounted-storage installation writes `/etc/fstab` and a systemd mount dependency.
   A backup is requested, but an actual reboot/missing-disk test remains necessary.
 - Builds are not transactional. Successful images are retagged before the full
@@ -200,3 +201,24 @@ At this audit, SSH to the supplied `192.168.1.51` host succeeded, but the earlie
 install/test logs were absent, `start_library.service` was inactive, and no
 containers were listed. The reason for that changed VM state is not established.
 No new installation or other remote mutation was performed during this audit.
+
+
+## November 8, 2026 — Storage seeding, reboot, and desktop Wi-Fi
+
+The native installer now seeds empty storage, including an ext filesystem with
+only `lost+found`, from `Library_USB.tar` before startup creates files. On
+`library`, missing starter content was restored without overwriting existing
+files; Maps and the Library homepage returned HTTP 200, LMS returned its expected
+root-path HTTP 404, and the startup unit completed successfully.
+
+Successful installs and rebuilds now schedule a reboot within one minute. The
+browser completion screen announces it. This completion behavior was checked
+with mocked shutdown commands; it is not evidence of a new live reboot test.
+
+The new local Wi-Fi UI has eight tests covering validation, CSRF/Host rejection,
+hotspot setup, password handling, and failed-connection recovery. Five desktop
+and ten native installer tests pass. Live Wi-Fi switching has not yet been
+verified. The live machine update was staged behind bootstrap’s lock while its
+reinstall was running; staging is not proof that the deferred update completed.
+These changes belong to Library-Creator_x86, independently of the separate
+Library-Creator Raspberry Pi project.

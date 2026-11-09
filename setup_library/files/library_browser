@@ -1,11 +1,8 @@
 #!/usr/bin/python3
-"""Wait for the local Library, then open Firefox in the root desktop session."""
+"""Immediately open the local startup progress page in the root desktop session."""
 import os
 from pathlib import Path
 import shutil
-import time
-import urllib.error
-import urllib.request
 
 
 def main():
@@ -14,17 +11,20 @@ def main():
     browser = shutil.which('firefox-esr') or shutil.which('firefox')
     if not browser:
         raise SystemExit('Firefox is not installed.')
-    url = 'http://localhost/'
-    deadline = time.monotonic() + 180
-    client = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-    while time.monotonic() < deadline:
-        try:
-            with client.open(url, timeout=2) as response:
-                if response.status == 200:
-                    break
-        except (OSError, urllib.error.URLError):
-            pass
-        time.sleep(2)
+    page = Path('/run/library-startup/progress.html')
+    page.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        # Exclusive creation preserves any progress already published by Ansible.
+        with page.open('x') as output:
+            output.write('<!doctype html><html lang="en"><meta charset="utf-8">'
+                         '<meta http-equiv="refresh" content="2">'
+                         '<title>Starting your Library</title>'
+                         '<body style="font:24px system-ui;background:#101a29;color:#ecf1fa;padding:40px">'
+                         '<h1>Starting your Library</h1>'
+                         '<p>Waiting for Ansible to start the Library services…</p></body></html>')
+    except FileExistsError:
+        pass
+    url = page.as_uri()
     profile = Path('/root/.mozilla/firefox/library')
     profile.mkdir(parents=True, exist_ok=True)
     os.execv(browser, [browser, '--profile', str(profile), '--new-window', url])

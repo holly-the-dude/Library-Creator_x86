@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Wi-Fi controls are available only on the local Library desktop.
+set -euo pipefail
+exec xdg-open http://127.0.0.1:4830/wifi/

@@ -8,7 +8,7 @@ RequiresMountsFor=/Library
 Type=oneshot
 RemainAfterExit=yes
 TimeoutStartSec=0
-ExecStart=/usr/bin/ansible-playbook -i localhost, -c local /root/start_library.yml
+ExecStart=/usr/bin/python3 /usr/local/bin/library_startup.py /usr/bin/ansible-playbook -i localhost, -c local /root/start_library.yml
 
 [Install]
 WantedBy=multi-user.target

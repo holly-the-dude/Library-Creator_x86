@@ -1,0 +1,26 @@
+#!/usr/bin/python3
+"""Enable the installed GNOME desktop icons and trust the Library launcher."""
+import ast
+import os
+import subprocess
+
+
+def run(*args):
+    return subprocess.run(args, text=True, capture_output=True, check=True).stdout.strip()
+
+
+if 'GNOME' in os.environ.get('XDG_CURRENT_DESKTOP', '').upper():
+    try:
+        value = run('gsettings', 'get', 'org.gnome.shell', 'enabled-extensions')
+        enabled = ast.literal_eval(value.removeprefix('@as '))
+        if 'ding@rastersoft.com' not in enabled:
+            enabled.append('ding@rastersoft.com')
+            run('gsettings', 'set', 'org.gnome.shell', 'enabled-extensions', repr(enabled))
+        run('gsettings', 'set', 'org.gnome.shell', 'disable-user-extensions', 'false')
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
+        print('Could not enable desktop icons:', error)
+for launcher in ('library.desktop', 'library-wifi.desktop'):
+    try:
+        run('gio', 'set', '/root/Desktop/' + launcher, 'metadata::trusted', 'true')
+    except (OSError, subprocess.SubprocessError):
+        pass  # Launchers are also available through the applications menu.

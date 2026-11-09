@@ -1,5 +1,10 @@
 # Wiki Container
 
+For **Library-Creator_x86**, the native installer seeds empty selected storage
+from `setup_library/files/Library_USB.tar`, including a small starter wiki ZIM.
+Nonempty storage is preserved. Add more archives through Downloads; see the
+[native installation guide](../../../../docs/INSTALL.md) for storage setup.
+
 The wiki container runs [kiwix-serve](https://github.com/kiwix/kiwix-tools) to provide offline access to Wikipedia and other ZIM-format wiki content. It serves a web interface on port 6902 that lets users browse the wiki library.
 
 The build detects Debian `amd64` or `arm64`, downloads Kiwix 3.5.0-1 for

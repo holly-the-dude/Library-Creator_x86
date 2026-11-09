@@ -1,5 +1,12 @@
 # library_maps
 
+For **Library-Creator_x86**, empty selected storage receives a starter PMTiles
+map from `setup_library/files/Library_USB.tar` before startup. An existing
+nonempty storage directory is preserved, so it may still need map downloads.
+OpenStreetMap startup requires content under `/Library/maps`; after adding your
+first map, run `sudo systemctl restart start_library`. StreetZim is a separate
+service and can start without map archives.
+
 A lightweight PMTiles map tile server for Debian AMD64/ARM64 hosts, based on `rasbase_master` (Debian 13).
 
 Serves `.pmtiles` files via nginx with HTTP range request support. Includes a built-in MapLibre GL JS viewer with a state selector, in-tile place/street search, a map-layer on/off panel, and optional car routing (turn-by-turn directions) via a bundled GraphHopper service. It is fully offline: no geocoder/Photon and no internet/CDN access are required at runtime.

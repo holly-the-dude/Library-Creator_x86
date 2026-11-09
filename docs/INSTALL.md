@@ -39,7 +39,8 @@ opens the interactive menu. Choose Fresh Install, select the USB partition
 (`/dev/sdb1` on libraryd) and Office preference, then confirm. Installation stages
 this checkout under `/opt/library-creator`, builds the base and applications,
 installs systemd units, and starts the Library. It requires no boot-stage cron
-jobs or automatic reboot. A failed image build stops installation before the
+jobs. After successful setup, it schedules a reboot within one minute and shows
+the reboot notice in the browser. Failed installs do not schedule a reboot. A failed image build stops installation before the
 new host configuration and services are installed.
 
 Open `http://localhost` on the machine, or `http://<machine-IP>` from another
@@ -72,6 +73,13 @@ erase confirmation and a 30-second countdown. Already-labelled Library_USB
 content is preserved on normal install. It never guesses an expendable disk. USB-content cloning is available through Downloads and the Install / Repair
 Clone menu. OS cloning still requires separate UEFI/BIOS support.
 
+Empty storage, including a filesystem containing only `lost+found`, receives
+`setup_library/files/Library_USB.tar` before services create folders or databases.
+This applies to system directories, already mounted disks, and freshly formatted
+USB storage. The archive includes sample music, a starter PMTiles map, and a
+small wiki archive. Nonempty storage is preserved and is not automatically
+merged with the bundled archive.
+
 Existing content is retained. The familiar folders include `library`, `wiki`,
 `music`, `calibre`, `maps`, and `documents`. The downloader creates its own
 additional directories as needed. `/etc/library/config.json` remembers storage
@@ -93,17 +101,30 @@ Optional Wi-Fi hotspot (run from a console or Ethernet connection):
 
 ```bash
 nmcli device status
-sudo ./bootstrap --hotspot-interface wlp2s0 --hotspot-password 'choose-a-password'
+sudo ./bootstrap --hotspot-interface wlp2s0
 ```
 
 Use the actual Wi-Fi interface name. The adapter must support AP mode.
-NetworkManager creates the `library-hotspot` connection, SSID `library`, WPA
-password you provide, and address `10.1.1.1/24`, with shared DHCP/DNS. Selecting
+NetworkManager creates the `library-hotspot` connection with open SSID
+`library` (no password) and address `10.1.1.1/24`, with shared DHCP/DNS.
+Existing hotspot security is removed when hotspot mode is configured. Selecting
 an adapter replaces its active client connection with the hotspot; the same
 adapter is not used as an internet client at the same time. Other connections
 are preserved. Ensure `10.1.1.0/24` is not already used by your LAN or VPN.
 
-To stop broadcasting and resume normal Wi-Fi use:
+For routine switching after installation, open **Library Wi-Fi** on the root
+desktop or in the applications menu. Select the adapter and hotspot or internet
+mode. Internet mode accepts the network SSID and password; saved credentials can
+be reused. The selected mode persists after reboot, and failed switches attempt
+to restore the previous connection. Ethernet is unchanged. GNOME receives
+Desktop Icons NG so the executable shortcut is visible after reboot.
+
+The controls listen only on `127.0.0.1:4830`, not on the homepage or the LAN.
+Without a Wi-Fi adapter, the local page explains that hardware is required.
+Host NetworkManager provides the hotspot; the inherited hotspot container is
+intentionally skipped during builds. See [Wi-Fi usage](USAGE.md#switch-wi-fi-modes-native-debian-version).
+
+For manual recovery, stop broadcasting with:
 
 ```bash
 sudo nmcli connection modify library-hotspot connection.autoconnect no
@@ -123,9 +144,12 @@ desktop. It refreshes every 15 seconds through to success or failure:
 install remains a console unless you install a Debian desktop yourself.
 After successful installation, existing GDM/GNOME, LightDM or SDDM desktops
 are configured to autologin as **root**, with password **`library`**, on the next
-boot. Firefox then opens **`http://localhost/`**, waiting up to three minutes for
-Library services to become ready. The current desktop is left open through the
-final installer screen; reboot when ready. See [desktop autologin details](../bootstrap.md#desktop-autologin-after-installation).
+boot. Firefox opens a local startup page immediately, showing which services
+Ansible is starting. The page refreshes every two seconds and opens
+**`http://localhost/`** after startup succeeds; failures remain visible.
+The **Library** desktop shortcut opens the homepage directly. The current desktop is left open through the
+final installer screen, which announces the automatic reboot within one minute.
+Keep power connected while the machine restarts. See [desktop autologin details](../bootstrap.md#desktop-autologin-after-installation).
 Pi TFT, touchscreen, GPIO, SPI overlays and framebuffer splash services are
 excluded from this installation path on both architectures.
 

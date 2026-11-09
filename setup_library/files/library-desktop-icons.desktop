@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Library desktop icons
+Exec=/usr/local/bin/library_desktop_icons
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

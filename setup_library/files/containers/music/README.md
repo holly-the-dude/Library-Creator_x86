@@ -1,5 +1,13 @@
 # Music Container
 
+For **Library-Creator_x86**, LMS starts when `/Library/music` contains media.
+The native installer loads starter content, including sample music, from
+`setup_library/files/Library_USB.tar` when the selected storage is empty
+(ignoring only `lost+found`). Nonempty storage is preserved. If LMS is marked
+**Not running**, check media files and `journalctl -u start_library` before
+rebuilding the image. After adding media, run
+`sudo systemctl restart start_library` to reevaluate startup.
+
 The music container runs [LMS (Lightweight Music Server)](https://github.com/epoupon/lms) to provide a web-based music streaming interface. It serves audio files from the library and supports the Subsonic API for mobile clients.
 
 Open **Music → Music library (LMS)** on the Library home page to use its `/music`

@@ -52,6 +52,13 @@ class DesktopTests(unittest.TestCase):
         launcher = self.root / 'usr/local/bin/library_browser'
         self.assertEqual(launcher.stat().st_mode & 0o777, 0o755)
         self.assertTrue((self.root / 'root/.config/autostart/library-browser.desktop').exists())
+        shortcut = self.root / 'root/Desktop/library-wifi.desktop'
+        self.assertEqual(shortcut.stat().st_mode & 0o777, 0o755)
+        self.assertIn('Exec=/usr/local/bin/library_wifi', shortcut.read_text())
+        library = self.root / 'root/Desktop/library.desktop'
+        self.assertEqual(library.stat().st_mode & 0o777, 0o755)
+        self.assertIn('Exec=xdg-open http://localhost/', library.read_text())
+        self.assertTrue((self.root / 'root/.config/autostart/library-desktop-icons.desktop').exists())
 
     def test_no_desktop_or_unknown_manager_never_changes_password(self):
         self.assertFalse(desktop.configure(self.root))

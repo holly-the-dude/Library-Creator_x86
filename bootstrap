@@ -26,7 +26,7 @@ Library installer — Debian Trixie amd64 / arm64
   ./bootstrap --check
 
 Options: --usb-device PARTITION, --storage directory|mounted, --office yes|no,
-         --hotspot-interface DEVICE --hotspot-password PASSWORD, --yes
+         --hotspot-interface DEVICE (open library SSID), --yes
 --yes skips the installation summary confirmation, NEVER erase confirmation.
 USB formatting always requires the exact device name and a 30-second countdown.
 Firefox opens file:///root/progress.html on the local
@@ -280,7 +280,11 @@ install_library() {
     msg_step "Installing Debian packages"
     apt-get update
     apt-get install -y podman ansible python3-jmespath python3-flask rsync curl jq \
-        ca-certificates util-linux exfatprogs udev firefox-esr git acl
+        ca-certificates util-linux exfatprogs udev firefox-esr git acl \
+        network-manager dnsmasq-base gunicorn xdg-utils
+    if [[ -x /usr/bin/gnome-shell ]]; then
+        apt-get install -y gnome-shell-extension-desktop-icons-ng
+    fi
     if [[ "${LIBRARY_PROGRESS_BROWSER_OPENED:-0}" != 1 ]]; then
         python3 "$SOURCE_DIR/setup_library/install_progress.py" --open || true
     fi
@@ -328,7 +332,7 @@ PY
     if [[ -n "$wifi" ]]; then
         apt-get install -y network-manager dnsmasq-base
         systemctl enable --now NetworkManager
-        bash /opt/library-creator/setup_library/configure_hotspot.sh "$wifi" "$password"
+        bash /opt/library-creator/setup_library/configure_hotspot.sh "$wifi"
     fi
     msg_step "Installing and starting Library services"
     if ! ansible-playbook -i localhost, -c local /opt/library-creator/setup_library/install_x86.yml; then
@@ -337,8 +341,9 @@ PY
     fi
     msg_step "Library installation complete"
     echo 'Library installed. Open http://localhost or http://<this-machine-IP> from your browser.'
-    echo 'HDMI uses the existing Debian desktop/console. No reboot is required.'
     echo 'On supported desktops, the next boot logs in as root (password: library) and opens Firefox at the Library.'
+    msg_step "Installation complete; rebooting in one minute"
+    shutdown -r +1 'Library installation complete. Rebooting to activate the installed configuration.'
 }
 
 
@@ -419,8 +424,8 @@ main() {
     case "$office" in ''|yes|no) ;; *) msg_error 'Office must be yes or no.'; return 2 ;; esac
     if [[ -n "$usb" && "$storage" == directory ]]; then msg_error 'USB and directory storage conflict.'; return 2; fi
     if [[ -n "$wifi$password" ]]; then
-        [[ -n "$wifi" && ${#password} -ge 8 && ${#password} -le 63 ]] || {
-            msg_error 'Hotspot needs an interface and an 8–63 character WPA password.'; return 2;
+        [[ -n "$wifi" && -z "$password" ]] || {
+            msg_error 'The library hotspot is open. Specify --hotspot-interface without --hotspot-password.'; return 2;
         }
     fi
     # Older explicit-option commands still select installation.

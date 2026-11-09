@@ -63,12 +63,30 @@
         dest: /root/start_library.yml
         mode: '0644'
 
+    - name: Create Wi-Fi helper directory
+      ansible.builtin.file:
+        path: /usr/local/lib/library-wifi
+        state: directory
+        mode: '0755'
+
+    - name: Install Wi-Fi web controls
+      ansible.builtin.copy:
+        src: files/library_wifi.py
+        dest: /usr/local/lib/library-wifi/library_wifi.py
+        mode: '0644'
+
+    - name: Install Wi-Fi hotspot configuration helper
+      ansible.builtin.copy:
+        src: configure_hotspot.sh
+        dest: /usr/local/bin/library_configure_hotspot
+        mode: '0755'
+
     - name: Install host control helpers
       ansible.builtin.copy:
         src: "files/{{ item }}"
         dest: "/usr/local/bin/{{ item }}"
         mode: '0755'
-      loop: [library_control.py, library_restart, library_shutdown.py, library_shutdown]
+      loop: [library_control.py, library_restart, library_shutdown.py, library_shutdown, library_wifi, library_startup.py]
 
     - name: Install systemd services
       ansible.builtin.copy:
@@ -81,6 +99,14 @@
         - library-control.socket
         - library-control.service
         - library-restart.service
+        - library-wifi.service
+
+    - name: Start Wi-Fi controls
+      ansible.builtin.systemd_service:
+        name: library-wifi.service
+        enabled: true
+        state: restarted
+        daemon_reload: true
 
     - name: Enable host control services
       ansible.builtin.systemd_service:

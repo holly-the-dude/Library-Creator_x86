@@ -58,7 +58,7 @@ class InstallerTests(unittest.TestCase):
         source = 'source "$1"; shift; preflight() { echo checked; }; main "$@"'
         for args, status in [(['--check'], 0), (['--storage', 'erase'], 2),
                              (['--office', 'maybe'], 2), (['--storage'], 2),
-                             (['--hotspot-interface', 'wlp2s0'], 2)]:
+                             (['--hotspot-password', 'obsolete-password'], 2)]:
             result = self.run_shell(source, str(ROOT / 'bootstrap'), *args)
             self.assertEqual(result.returncode, status, result.stdout + result.stderr)
         self.assertFalse(self.log.exists())
@@ -85,6 +85,7 @@ class InstallerTests(unittest.TestCase):
         self.fake('apt-get', 'echo apt >> "$TEST_LOG"')
         self.fake('rsync', 'echo stage >> "$TEST_LOG"')
         self.fake('ansible-playbook', 'echo services >> "$TEST_LOG"')
+        self.fake('shutdown', 'echo reboot >> "$TEST_LOG"')
         self.fake('mountpoint', 'exit "${MOUNT_STATUS:-1}"')
         run = 'source "$1"; shift; preflight() { :; }; main --worker --install --yes "$@"'
         result = self.run_shell(run, str(script), '--office', 'yes')
@@ -98,6 +99,7 @@ class InstallerTests(unittest.TestCase):
                           'library_storage_path': str(self.root / 'Library')})
         calls = self.log.read_text().splitlines()
         self.assertLess(calls.index('build:yes'), calls.index('services'))
+        self.assertLess(calls.index('services'), calls.index('reboot'))
         result = self.run_shell(run, str(script))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(sample.read_bytes(), b'user content')
@@ -108,6 +110,7 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(result.returncode, 19, result.stdout + result.stderr)
         self.assertEqual(config.read_text(), before)
         self.assertEqual(self.log.read_text().count('services'), 2)
+        self.assertEqual(self.log.read_text().count('reboot'), 2)
         self.env['MOUNT_STATUS'] = '1'
         before_calls = self.log.read_text()
         result = self.run_shell(run, str(script), '--storage', 'mounted')

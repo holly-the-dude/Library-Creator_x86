@@ -1,4 +1,10 @@
-# Hotspot Container
+# Hotspot Container — retained Raspberry Pi reference
+
+**Library-Creator_x86 does not build or start this container.** Host
+NetworkManager provides its open `library` hotspot. Use the **Library Wi-Fi**
+desktop shortcut; see [native Wi-Fi setup](../../../../docs/INSTALL.md#ethernet-wi-fi-and-vms).
+The instructions below describe the retained container from the separate
+**Library-Creator** Raspberry Pi project.
 
 The hotspot container creates a WiFi access point so users can connect directly to the Library system without an existing network. It broadcasts SSID `library` (open, no password) and provides DHCP/DNS so clients can reach the library webserver at `http://library` or `http://library.local`.
 

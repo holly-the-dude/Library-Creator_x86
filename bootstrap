@@ -302,6 +302,13 @@ install_library() {
         rsync -a --exclude=.git --exclude=rasbase_parts --exclude=__pycache__ \
             "$SOURCE_DIR/" /opt/library-creator/
     fi
+    # ext filesystems may contain lost+found even when no content was added.
+    # Seed before startup creates directories and databases on the content disk.
+    if [[ -z "$(find /Library/ -mindepth 1 -maxdepth 1 ! -name lost+found -print -quit)" ]]; then
+        msg_step "Loading bundled Library content into empty storage"
+        tar -xzf /opt/library-creator/setup_library/files/Library_USB.tar \
+            --no-same-owner --keep-old-files -C /Library
+    fi
     msg_step "Building the Debian base and application containers"
     export LIBRARY_OFFICE="$office"
     export LIBRARY_REBUILD="$rebuild"

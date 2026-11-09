@@ -1,10 +1,12 @@
 """Native amd64/arm64 installer checks; host paths and commands are sandboxed."""
 import json
+import io
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import tarfile
 import unittest
 
 import yaml
@@ -65,13 +67,20 @@ class InstallerTests(unittest.TestCase):
         # Run main with real shell control flow and filesystem operations, but
         # route every host path to the fixture and mock apt, rsync and Ansible.
         source = (ROOT / 'bootstrap').read_text().replace('$EUID', '0')
+        source = source.replace('/Library_USB.tar', '/SEED_ARCHIVE.tar')
         for path in ['/etc/library', '/opt/library-creator', '/Library', '/run/lock']:
             source = source.replace(path, str(self.root / path.lstrip('/')))
+        source = source.replace('/SEED_ARCHIVE.tar', '/Library_USB.tar')
         script = self.root / 'installer.sh'
         script.write_text(source)
         (self.root / 'run/lock').mkdir(parents=True)
         builds = self.root / 'opt/library-creator/setup_library/files/containers'
         builds.mkdir(parents=True)
+        with tarfile.open(builds.parent / 'Library_USB.tar', 'w:gz') as archive:
+            seed = tarfile.TarInfo('music/sample.mp3')
+            seed.size = 4
+            archive.addfile(seed, io.BytesIO(b'seed'))
+        (self.root / 'Library/lost+found').mkdir(parents=True)
         (builds / 'build_pods.sh').write_text('echo build:$LIBRARY_OFFICE >> "$TEST_LOG"\nexit "${BUILD_STATUS:-0}"\n')
         self.fake('apt-get', 'echo apt >> "$TEST_LOG"')
         self.fake('rsync', 'echo stage >> "$TEST_LOG"')
@@ -80,6 +89,9 @@ class InstallerTests(unittest.TestCase):
         run = 'source "$1"; shift; preflight() { :; }; main --worker --install --yes "$@"'
         result = self.run_shell(run, str(script), '--office', 'yes')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        sample = self.root / 'Library/music/sample.mp3'
+        self.assertEqual(sample.read_bytes(), b'seed')
+        sample.write_bytes(b'user content')
         config = self.root / 'etc/library/config.json'
         self.assertEqual(json.loads(config.read_text()),
                          {'library_storage_mode': 'directory', 'library_office': 'yes', 'library_usb_device': '',
@@ -88,6 +100,7 @@ class InstallerTests(unittest.TestCase):
         self.assertLess(calls.index('build:yes'), calls.index('services'))
         result = self.run_shell(run, str(script))
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(sample.read_bytes(), b'user content')
         self.assertEqual(self.log.read_text().count('build:yes'), 2)
         before = config.read_text()
         self.env['BUILD_STATUS'] = '19'
@@ -103,13 +116,14 @@ class InstallerTests(unittest.TestCase):
         # A desktop-mounted USB may be reached through /Library -> /media/... .
         self.env.update(BUILD_STATUS='0', MOUNT_STATUS='0')
         library = self.root / 'Library'
-        library.rmdir()
+        shutil.rmtree(library)
         usb = self.root / 'mounted USB'
         usb.mkdir()
         library.symlink_to(usb, target_is_directory=True)
         result = self.run_shell(run, str(script), '--storage', 'mounted')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertTrue(library.is_symlink())
+        self.assertEqual((usb / 'music/sample.mp3').read_bytes(), b'seed')
         self.assertEqual(json.loads(config.read_text())['library_storage_path'], str(usb))
 
     def mock_podman_builds(self):

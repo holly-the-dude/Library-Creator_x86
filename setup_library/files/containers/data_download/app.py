@@ -362,9 +362,16 @@ def extract_pdfs(archive, target, storage, event, progress):
                         extracted += len(block)
                         progress(extracted=extracted)
                 # ZipExtFile verifies each PDF's CRC when read to EOF.
+                destination.chmod(0o644)
             check_cancel(event)
             if target.exists():
                 raise ValueError("Destination already exists; existing content was kept")
+            # mkdtemp creates a private 0700 root. The published collection
+            # must be traversable by nginx's unprivileged www-data worker.
+            for directory in staging.rglob("*"):
+                if directory.is_dir():
+                    directory.chmod(0o755)
+            staging.chmod(0o755)
             staging.rename(target)
         finally:
             if staging.exists():

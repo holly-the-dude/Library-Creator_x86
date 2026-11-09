@@ -894,6 +894,9 @@
     # WEBSERVER (main library front-end) — started only if /Library/library
     # exists. Serves on 10.88.0.201:80 and is the primary landing page.
     ###############################
+    - name: Repair permissions of publicly served content
+      ansible.builtin.import_tasks: "{{ library_install_root }}/setup_library/public_content_permissions.yml"
+
     - name: see if webserver is there if not dont start
       ansible.builtin.shell: |
         test -d /Library/library && echo exist || echo absent

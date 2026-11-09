@@ -1,0 +1,14 @@
+---
+- name: Check public Library content directory
+  ansible.builtin.stat:
+    path: /Library/library
+  register: library_public_content
+
+- name: Allow the webserver to read public content and traverse its directories
+  when: library_public_content.stat.isdir | default(false)
+  ansible.builtin.file:
+    path: /Library/library
+    state: directory
+    recurse: true
+    follow: false
+    mode: a+rX

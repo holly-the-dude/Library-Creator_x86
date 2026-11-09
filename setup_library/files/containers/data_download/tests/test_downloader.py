@@ -12,6 +12,7 @@ See ../docs/TESTING.md for coverage, prerequisites, and manual Pi checks.
 import hashlib
 import io
 import json
+import os
 import stat
 import sys
 import tempfile
@@ -283,9 +284,16 @@ class StorageTests(unittest.TestCase):
     def test_extracts_only_pdfs_into_category(self):
         archive = self.archive([("sub/book.PDF", b"%PDF-test"), ("readme.txt", b"skip")])
         target = self.root / "library" / "Accounting"
-        app.extract_pdfs(archive, target, self.storage, self.event, self.progress)
+        previous_umask = os.umask(0o077)
+        try:
+            app.extract_pdfs(archive, target, self.storage, self.event, self.progress)
+        finally:
+            os.umask(previous_umask)
         self.assertEqual((target / "sub/book.PDF").read_bytes(), b"%PDF-test")
         self.assertFalse((target / "readme.txt").exists())
+        self.assertEqual(stat.S_IMODE(target.stat().st_mode), 0o755)
+        self.assertEqual(stat.S_IMODE((target / 'sub').stat().st_mode), 0o755)
+        self.assertEqual(stat.S_IMODE((target / 'sub/book.PDF').stat().st_mode), 0o644)
 
     def test_zip_traversal_absolute_windows_and_symlink_rejected(self):
         link = zipfile.ZipInfo("link.pdf")

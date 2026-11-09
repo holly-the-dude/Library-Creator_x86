@@ -80,6 +80,11 @@ USB storage. The archive includes sample music, a starter PMTiles map, and a
 small wiki archive. Nonempty storage is preserved and is not automatically
 merged with the bundled archive.
 
+The installer and startup playbook grant read/traverse access to public files
+under `/Library/library`, retaining ownership and existing write permissions.
+Private application data elsewhere under `/Library` is not changed. This repairs
+PDF HTTP 403 errors from older downloaded collection directories.
+
 Existing content is retained. The familiar folders include `library`, `wiki`,
 `music`, `calibre`, `maps`, and `documents`. The downloader creates its own
 additional directories as needed. `/etc/library/config.json` remembers storage

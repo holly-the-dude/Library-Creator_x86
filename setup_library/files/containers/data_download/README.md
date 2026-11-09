@@ -438,3 +438,24 @@ node --check static/app.js
 Tests use temporary directories, small in-memory responses/ZIPs, and a localhost
 HTTP server. They require no external network and do not touch `/Library`.
 See the [testing guide](docs/TESTING.md) for details and checks on the target Pi.
+
+
+### Downloaded PDFs return HTTP 403
+
+Older builds renamed a private temporary extraction directory into the public
+collection folder, retaining mode `0700`. Nginx could list the generated links
+but could not traverse the collection folder. Current builds publish collection
+directories as `0755` and PDFs as `0644`, including under a restrictive umask.
+
+The native installer and startup playbook also repair read/traverse access under
+`/Library/library` only, retaining ownership and existing write permissions.
+They do not open permissions across all of `/Library` or private application data.
+For an existing affected collection, the operator can repair public content with:
+
+```bash
+sudo find /Library/library -type d -exec chmod a+rx {} +
+sudo find /Library/library -type f -exec chmod a+r {} +
+```
+
+Update the downloader image as well to prevent new collections inheriting the
+old directory permissions. No webserver restart is needed for a permissions repair.

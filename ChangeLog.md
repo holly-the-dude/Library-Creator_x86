@@ -10,6 +10,8 @@ unless they affect installation or use.
 These changes apply to **Library-Creator_x86**. **Library-Creator** remains a
 separate Raspberry Pi project.
 
+- Fix PDF HTTP 403 errors by publishing readable collection directories and
+  repairing public content read/traverse permissions during install and startup.
 - Seed empty selected storage from `setup_library/files/Library_USB.tar` before
   services create directories or databases; tolerate a lone `lost+found` and
   preserve nonempty storage.

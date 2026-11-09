@@ -120,7 +120,11 @@
       ansible.builtin.import_tasks: clone_tasks.yml
       tags: [clone_service]
 
-    - name: Start or refresh Library
+    - name: Repair public content permissions before starting Library
+      # Only publicly served files: preserve ownership and existing write bits.
+      ansible.builtin.import_tasks: public_content_permissions.yml
+
+    - name: Start or refresh Library services
       ansible.builtin.systemd_service:
         name: start_library.service
         enabled: true
